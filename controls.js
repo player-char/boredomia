@@ -11,8 +11,10 @@ for (let k of availableKeys) {
 
 window.onkeydown = function(e) {
 	let k = e.keyCode
-	//console.log(k)
-	if (!kd.has(k)) return
+	if (!kd.has(k)) {
+		console.log(k)
+		return
+	}
 	e.preventDefault()
 	if (kd.get(k) == 1) return
 	kd.set(k, 1)
