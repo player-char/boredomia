@@ -12,7 +12,7 @@ for (let k of availableKeys) {
 window.onkeydown = function(e) {
 	let k = e.keyCode
 	if (!kd.has(k)) {
-		console.log(k)
+		console.log('Key pressed:', k)
 		return
 	}
 	e.preventDefault()
