@@ -5,10 +5,10 @@ let w = 0
 let h = 0
 let w2 = 0
 let h2 = 0
-let tsz = 64 // tile size
-let tsz2 = Math.round(tsz / 2)
-let tsz3 = Math.round(tsz / 3)
-let tsz4 = Math.round(tsz / 4)
+let tsz = 0 // tile size
+let tsz2 = 0
+let tsz3 = 0
+let tsz4 = 0
 let camYOffset = -1
 
 let pl = null  // player data
@@ -43,13 +43,28 @@ function loadRes() {
 }
 
 function resize() {
-    w = canv.width = 1200//window.innerWidth
-    h = canv.height = 800//window.innerHeight
+	let diagSize = 1500
+	w = window.innerWidth
+	h = window.innerHeight
+	let k = diagSize / Math.hypot(w, h)
+	tsz = 64 // tile size
+	// increase quality (can be laggy)
+	//while (k < 3) {
+	//	tsz *= 2
+	//	k *= 2
+	//}
+	tsz2 = Math.round(tsz / 2)
+	tsz3 = Math.round(tsz / 3)
+	tsz4 = Math.round(tsz / 4)
+	w = Math.floor(w * k / 2) * 2
+	h = Math.floor(h * k / 2) * 2
+    canv.width = w
+    canv.height = h
     w2 = w/2
     h2 = h/2
     redraw()
 }
-//window.onresize = resize
+window.onresize = resize
 resize()
 loadRes()
 
@@ -63,21 +78,20 @@ function redraw() {
 	renderBlockGrid(bm, pl.x, pl.y + camYOffset)
 	if (g.editor) {
 		// render some editor gui here
-		//renderOrangeC(bm, w2-tsz2, h2+tsz4, tsz, tsz) //
 		
 		// map bounds
-		bm.strokeRect(w2 - pl.x * tsz, h2 - (pl.y + camYOffset) * tsz, map.w * tsz, map.h * tsz)
+		canv.strokeRect(w2 - Math.floor(pl.x * tsz), h2 - Math.floor((pl.y + camYOffset) * tsz), map.w * tsz, map.h * tsz)
 		
 		return
 	}
 	renderOrangeC(bm, w2-tsz2, h2+tsz4, tsz, tsz)
 	
-	bm.font = '4vw sans-serif'
+	bm.font = tsz2 + 'px sans-serif'
 	bm.textAlign = 'left'
 	bm.textBaseline = 'top'
 	bm.strokeStyle = '#000'
 	bm.fillStyle = '#fff'
-	bm.lineWidth = 4
+	bm.lineWidth = Math.ceil(tsz4 * 0.2)
 	strokeFillText(bm, 'Score: ' + g.score, 10, 10)
 	
     if (!pl.alive) {
@@ -119,7 +133,7 @@ function renderBlockGrid(bm, cx, cy) {
 		if (e.type == 'food') {
 			//bm.fillStyle = '#fa0'
 			//bm.fillRect(x, y, tsz, tsz)
-			bm.font = tsz * 0.5 + 'px sans-serif'
+			bm.font = tsz2 + 'px sans-serif'
 			bm.textAlign = 'center'
 			bm.textBaseline = 'middle'
 			bm.fillText(e.sprite, x + tsz2, y + tsz2)
@@ -160,12 +174,12 @@ function renderOrangeC(bm, x, y, w, h) {
 }
 
 function renderMessage(bm, text, x, y) {
-	bm.font = '5vw sans-serif'
+	bm.font = tsz2 + 'px sans-serif'
 	bm.textAlign = 'center'
 	bm.textBaseline = 'middle'
 	bm.strokeStyle = '#000'
 	bm.fillStyle = '#fff'
-	bm.lineWidth = 5
+	bm.lineWidth = Math.ceil(tsz4 * 0.2)
 	strokeFillText(bm, text, x, y)
 }
 
@@ -233,7 +247,7 @@ function startGame() {
 	map = {}
 	map.data = `
 		s#............................................................................................................#
-		s.............................................................................................................#
+		ss............................................................................................................#
 		ss..............................................................ssss.....................................gg...#
 		ss.................................ggggggg......................|..|.............g.......................gg...#
 		ss.................................|.....|..............g.......|..|..sss........ggggg...................;;;..#
@@ -257,23 +271,27 @@ function startGame() {
 			y: 5,
 		}
 	]
-    tick()
+	setInterval(tick, 20)
+    //tick()
 }
 
 // physical constants
 let PHYS = {
+	ga: 0.03,       // gravity acceleration
 	runa: 0.06,     // running acceleration
 	flya: 0.01,     // flying acceleration
 	stopv: 0.08,    // stop speed
 	jumpv: 0.47,    // jump start speed
-	ga: 0.03,       // gravity acceleration
+	maxvx: 0.5,     // max horizontal speed
+	maxvy: 0.9375,  // max vertical speed
 	gammar: 0.8,    // ground non-friction
 	gammaf: 0.983,  // air non-friction
-	uh: 0.9,        // height of player character
+	uh: 0.65,       // height of player character
 	uw: 0.4,        // half of thickness of player character
 	ulw: 0.2,       // landing width
 	jumpcd: 20,     // jump cooldown ticks
-	edflyv: 0.5   // editor fly speed
+	edflyv: 0.5,    // editor fly speed
+	eps: 0.01,      // epsilon, a small number for offsets
 }
 
 function processPhysics() {
@@ -290,6 +308,8 @@ function processPhysics() {
 	if (inp.x) {
 		// run
 		pl.vx += inp.x * (pl.ground ? PHYS.runa : PHYS.flya)
+		if (pl.vx > PHYS.maxvy) pl.vy = PHYS.maxvy
+		if (pl.vx < -PHYS.maxvy) pl.vy = -PHYS.maxvy
 		pl.dir = +(inp.x > 0)
 	}
 	if (pl.ground && inp.y > 0 && !pl.jumpCooldown) {
@@ -299,7 +319,7 @@ function processPhysics() {
 		pl.jumpCooldown = PHYS.jumpcd
 	}
 	
-	if (!pl.vx && !pl.vy) {
+	if (!pl.vx && !pl.vy && !inp.x && !inp.y) {
 		// no motion at all
 		return
 	}
@@ -307,22 +327,24 @@ function processPhysics() {
 	let newy = pl.y + pl.vy
 	
 	// check ceiling
-	let crb = getBlockAt(pl.x + PHYS.ulw, newy - PHYS.uh)
-	let clb = getBlockAt(pl.x - PHYS.ulw, newy - PHYS.uh)
-	if (isSolid(crb) || isSolid(clb)) {
-		pl.y = Math.ceil(newy - PHYS.uh) + PHYS.uh + 0.01
-		pl.vy = 0.0
+	if (pl.vy <= 0.0) {
+		let crb = getBlockAt(pl.x + PHYS.ulw, newy - PHYS.uh)
+		let clb = getBlockAt(pl.x - PHYS.ulw, newy - PHYS.uh)
+		if (isSolid(crb) || isSolid(clb)) {
+			pl.y = Math.ceil(newy - PHYS.uh) + PHYS.uh + PHYS.eps
+			pl.vy = 0.0
+		}
 	}
 	
 	// check walls
 	let dir = Math.sign(pl.vx)
 	for (let dir of [-1.0, 1.0]) {
 		let wlb = getBlockAt(newx + PHYS.uw * dir, pl.y - 0.3)
-		let wub = getBlockAt(newx + PHYS.uw * dir, pl.y - 0.85)
+		let wub = getBlockAt(newx + PHYS.uw * dir, pl.y - 0.5)
 		if (isSolid(wlb) || isSolid(wub)) {
 			pl.vx = 0.0
 			if (isSolid(wlb)) {
-				pl.x = Math.floor(pl.x) + 0.5 + dir * (0.5 - PHYS.uw - 0.01)
+				pl.x = Math.floor(pl.x) + 0.5 + dir * (0.5 - PHYS.uw - PHYS.eps)
 			}
 		}
 	}
@@ -332,6 +354,7 @@ function processPhysics() {
 	if (!pl.ground) {
 		pl.y += pl.vy
 		pl.vy += PHYS.ga
+		if (pl.vy > PHYS.maxvy) pl.vy = PHYS.maxvy
 		
 		// landing
 		let rb = getBlockAt(pl.x + (inp.x > 0 ? PHYS.uw : PHYS.ulw), pl.y)
@@ -342,14 +365,18 @@ function processPhysics() {
 		}
 		if (isSolid(rb) || isSolid(lb)) {
 			pl.y = Math.floor(pl.y)
+			pl.vy = 0.0
 			pl.ground = true
 		}
-	} else if (pl.vx != 0.0) {
+	} else {
 		// fall down
-		let rb = getBlockAt(pl.x + PHYS.ulw, pl.y + 0.001)
-		let lb = getBlockAt(pl.x - PHYS.ulw, pl.y + 0.001)
+		let rb = getBlockAt(pl.x + PHYS.ulw, pl.y + PHYS.eps)
+		let lb = getBlockAt(pl.x - PHYS.ulw, pl.y + PHYS.eps)
 		if (!isSolid(rb) && !isSolid(lb)) {
 			pl.ground = false
+		} else if (inp.y < 0 && (!isSolid(rb) || !isSolid(lb))) {
+			console.log('d')
+			pl.x += 0.17 * (!isSolid(rb) - !isSolid(lb))
 		}
 	}
 	
@@ -385,6 +412,7 @@ function processGameLogic() {
 }
 
 function tick() {
+	//setTimeout(tick, 20)
 	let t = performance.now()
 	if (g && pl.alive) {
 		processPhysics()
@@ -395,5 +423,4 @@ function tick() {
 	redraw()
 	let drawT = performance.now() - t
 	if (physT > 5 || drawT > 5) console.log(physT, drawT)
-	setTimeout(tick, 20)
 }
