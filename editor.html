@@ -2,7 +2,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Boredomia</title>
+<title>Boredomia Editor</title>
+<link href="editor-gui.css" rel="stylesheet" type="text/css">
 <!--
 <meta name="description" content="ETO SAUAUBSHENNEEE TAUZHE DAUCUZYWAET, TCHTO RANNDAUM NERANNDAUMMENN">
 <meta property="og:title" content="CUSTEETEEZACCEEIA RANNDAUMMKEE NEEEZBEZHNNA">
@@ -12,7 +13,7 @@
 <style>
 body {
     margin: 0;
-	background: #aaa;
+	background: #333;
 	font-family: Tahoma, sans-serif;
     overflow: hidden;
 }
@@ -27,6 +28,14 @@ body {
     display: block;
     margin: 0 auto;
 }
+
+#gui-container {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 0;
+	height: 0;
+}
 </style>
 </head>
 <body>
@@ -38,9 +47,10 @@ body {
 <script src="js/blocks.js"></script>
 <script src="js/map.js"></script>
 <script src="js/resources.js"></script>
+<script src="js/map-editor.js"></script>
 <script src="js/game.js"></script>
 <script>
-loadRes(() => startGame('lvl1'))
+loadRes()
 </script>
 </body>
 </html>

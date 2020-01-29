@@ -2,49 +2,36 @@ let pl = null  // player data
 let g = null   // game status data
 let map = null // map data
 
-
-let loader = document.getElementById('loader')
-let imgs = {
-    'orangec0': null,
-    'orangec1': null,
-    'boring': null,
-    'bored0': null,
-    'bored1': null,
-}
-
-function loadRes() {
-    let imgsRequired = Object.keys(imgs).length
-
-    for (let imgName in imgs) {
-        let i = document.createElement('img')
-        i.onload = () => {
-            //console.log('loaded', imgName)
-            if (--imgsRequired == 0) {
-                startGame()
-            }
-        }
-        i.onerror = () => alert('Потрачено, релоадните страницу')
-        i.src = './img/' + imgName + '.png'
-        imgs[imgName] = i
-        loader.appendChild(i)
-    }
-}
+const tickDelay = 20
 
 window.onresize = resize
 resize()
 loadRes()
 
-function startGame() {
-	// there will be lvl name and more long-term data
-	g = {
-		editor: false,
+function startGame(lvlName) {
+	loadLvl(lvlName).then(() => {
+		g = {
+			editor: false,
+			lvlName: lvlName,
+		}
+		loadMap(lvls[lvlName])
+		initPlayer()
+	})
+}
+
+function initPlayer() {
+    pl = {
+        dir: map.defaultPlayerPos.dir || 0,
+        x: map.defaultPlayerPos.x,
+		y: map.defaultPlayerPos.y,
+		vx: 0.0,
+		vy: 0.0,
+		jumpCooldown: 0,
+		ground: true,
+		alive: true,
+		bored: false,
 		score: 0,
-	}
-	
-	loadMap()
-	tileCache = null
-	
-	setInterval(tick, 20)
+    }
 }
 
 function processGameLogic() {
@@ -53,15 +40,28 @@ function processGameLogic() {
 	}
 }
 
+let debug = {
+	series: [],
+	maxSize: 1000,
+	show: false,
+}
+
 function tick() {
 	let t = performance.now()
-	if (g && pl.alive) {
+	if (g && pl && pl.alive) {
 		processPhysics()
 		processGameLogic()
 	}
-	let physT = performance.now() - t
+	let engineT = performance.now() - t
 	t = performance.now()
 	redraw()
-	let drawT = performance.now() - t
-	if (physT > 5 || drawT > 5) console.log('Takes too long:', physT, drawT)
+	let renderT = performance.now() - t
+	debug.series.unshift({
+		engineT, renderT
+	})
+	if (debug.series.length > debug.maxSize) debug.series.pop()
+	if (engineT > 5 || renderT > 5) console.log('Takes too long:', engineT, renderT)
+	if (debug.show) renderDebug(debug)
 }
+
+setInterval(tick, tickDelay)

@@ -1,10 +1,16 @@
-// 'map' means 'current part of the game world'
-
 function getBlockAt(x, y) {
 	return getBlock(Math.floor(x), Math.floor(y))
 }
 
-function getBlock(i, j) {
+function isOutOfMap(bi, bj) {
+	return bi < 0 || bj < 0 || bi >= map.w || bj >= map.h
+}
+
+function isMapEdge(bi, bj) {
+	return bi <= 0 || bj <= 0 || bi >= map.w-1 || bj >= map.h-1
+}
+
+function getValidIndex(i, j) {
     if (j < 0) {
         j = 0
     }
@@ -18,65 +24,90 @@ function getBlock(i, j) {
         i = map.w - 1
     }
 	
-	j = map.h - 1 - j
-    return map.data[j][i]
+	return index(i, j)
 }
 
-function getTileEntityAt(x, y) {
-	return map.tileEntityMap.get(Math.floor(x) + '_' + Math.floor(y))
+function getBlock(i, j) {
+	return map.blData[getValidIndex(i, j)]
+}
+
+function getTileEntity(i, j) {
+	return map.tileEntityMap.get(i + '_' + j)
 }
 
 function destroyTileEntity(te) {
+	if (!te) return
 	map.tileEntityList = map.tileEntityList.filter((z) => (z != te))
 	map.tileEntityMap.delete(te.x + '_' + te.y)
 	renderTileGlobal(te.x, te.y)
 }
 
-function loadMap() {
-	// map is hardcoded at the moment
-	map = {}
-	map.data = `
-		s#............................................................................................................#
-		ss............................................................................................................#
-		ss..............................................................ssss.....................................gg...#
-		ss.................................ggggggg......................|..|.............g.......................dd...#
-		ss.................................|.....|..............g.......|..|..sss........ggggg...................;;;..#
-		ss:................................|.....|..........g..;;.......|..|..s:;;.......|...|.......gg..........dd;..#
-		ss:...g.............g.....g;gg;g...|gg...|....g.g...gg.;;......g;;g|.:s:ddgggggggggg.|.......||...ggg...:dd;;.#
-		sss...;;......g...ggg;....d;.d;g..g;;;...|..g;;;;;;ggg;;;;..g;;;;;;:::s:ss;ssss:..:s.|.......||...|.|...:dd;;.#
-		sssg.;;;...gggglllgggd.g..dd;;;ggggd;;;.gg;;;;;;;;;;;dd;d;;.;;;;;;::::s:::::::::s::sg|.......||...|.|..::ddd;.#
-		sssdgdddgggddddlllsdsggggggddddddddddddggddddd;;;ddd;;dddddgdddddddslsssssssssssssssdgg.gg;ggllllllllllllddddgg
-		ssssdddddddddddsllsdddddddddddddddddddddddddddddddddd;;;;;;;;;;;ddsssssssssssssssssssddgd;;ddlllllllllllldddddd
-		ssssdddddddddddslllsddddddddddddddddddddddddddddddddddddddddddddddsssssssssssssssssssddddddddlllllllllllldddddd
-	`.trim().split('\n').reverse().map(s => s.trim()),
-    map.h = map.data.length
-    map.w = map.data[0].length
-	map.tileEntityList = [
-		{
-			type: 'food',
-			sprite: '🍌',
-			collect: true,
-			score: 5,
-			x: 6,
-			y: 5,
+function addTileEntity(te) {
+	if (!te) return
+	map.tileEntityList.push(te)
+	map.tileEntityMap.set(te.x + '_' + te.y, te)
+	renderTileGlobal(te.x, te.y)
+}
+
+function mapFloodFill(start, condition, callback) {
+	let queue = [start]
+	while (queue.length) {
+		let [bi, bj] = queue.shift()
+		if (isOutOfMap(bi, bj)) continue
+		if (condition(bi, bj)) {
+			callback(bi, bj)
+			queue.push([bi + 1, bj])
+			queue.push([bi - 1, bj])
+			queue.push([bi, bj + 1])
+			queue.push([bi, bj - 1])
 		}
-	]
+	}
+}
+
+function loadMap(lvlData) {
+	map = JSON.parse(lvlData)
+	for (let prop of ['blData', 'bgData', 'fgData']) {
+		map[prop] = Uint8ClampedArray.from(map[prop])
+	}
+	preprocessMap(map)
+}
+
+function createEmptyMap() {
+	map = {
+		w: 10,
+		h: 10,
+		defaultPlayerPos: {x: 4.5, y: 6, dir: 0},
+		tileEntityList: [],
+	}
+	for (let prop of ['blData', 'bgData', 'fgData']) {
+		map[prop] = new Uint8ClampedArray(map.w * map.h)
+		map[prop].fill(0)
+	}
+	preprocessMap(map)
+}
+
+function preprocessMap(map) {
+	map.fgDataCurr = Uint8ClampedArray.from(map.fgData)
+	map.fgEntrance = null
+	map.area = map.w * map.h
+	
 	map.tileEntityMap = new Map()
 	for (let te of map.tileEntityList) {
 		map.tileEntityMap.set(te.x + '_' + te.y, te)
 	}
-
-	// init player
-    pl = {
-        dir: 0,
-        x: 4.5,
-        y: 9.0,
-		vx: 0.0,
-		vy: 0.0,
-		jumpCooldown: 0,
-		ground: true,
-		alive: true,
-		bored: false,
-    }
+	
+	// load all linked lvls
+	for (let te of map.tileEntityList) {
+		if (te.type !== 'portal') continue
+		let lvlName = te.lvl
+		let destId = te.destination
+		if (!lvlName || !destId) continue
+		loadLvl(lvlName)
+	}
+	
+	tileCache = null
 }
 
+function index(i, j) {
+	return i + j * map.w
+}

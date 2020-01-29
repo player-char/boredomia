@@ -1,5 +1,5 @@
 // physical constants
-let PHYS = {
+const PHYS = {
 	ga: 0.03,       // gravity acceleration
 	runa: 0.06,     // running acceleration
 	flya: 0.01,     // flying acceleration
@@ -18,19 +18,24 @@ let PHYS = {
 }
 
 function isSolid(b) {
-	return '#gds'.includes(b)
+	return blockSolid[b]
+}
+
+function isDeadly(b) {
+	return b === 10
 }
 
 function processPhysics() {
-	// input processing
-	if (pl.jumpCooldown) {
-		pl.jumpCooldown--
-	}
 	let inp = getKeyInputs()
+	// editor physics
 	if (g.editor) {
 		pl.x += PHYS.edflyv * inp.x
 		pl.y -= PHYS.edflyv * inp.y
 		return
+	}
+	// game physics
+	if (pl.jumpCooldown) {
+		pl.jumpCooldown--
 	}
 	if (inp.x) {
 		// run
@@ -46,7 +51,7 @@ function processPhysics() {
 		pl.jumpCooldown = PHYS.jumpcd
 	}
 	
-	if (!pl.vx && !pl.vy && !inp.x && !inp.y) {
+	if (!pl.vx && !pl.vy && !inp.x && !inp.y && pl.ground) {
 		// no motion at all
 		return
 	}
@@ -86,7 +91,7 @@ function processPhysics() {
 		// landing
 		let rb = getBlockAt(pl.x + (inp.x > 0 ? PHYS.uw : PHYS.ulw), pl.y)
 		let lb = getBlockAt(pl.x - (inp.x < 0 ? PHYS.uw : PHYS.ulw), pl.y)
-		if ('l' == rb || 'l' == lb) {
+		if (isDeadly(rb) || isDeadly(lb)) {
 			pl.alive = false
 			pl.bored = true
 		}
@@ -102,6 +107,7 @@ function processPhysics() {
 		if (!isSolid(rb) && !isSolid(lb)) {
 			pl.ground = false
 		} else if (inp.y < 0 && (!isSolid(rb) || !isSolid(lb))) {
+			// falling down intentionally
 			pl.x += 0.17 * (!isSolid(rb) - !isSolid(lb))
 		}
 	}
@@ -112,14 +118,44 @@ function processPhysics() {
 	} else {
 		pl.vx *= pl.ground ? PHYS.gammar : PHYS.gammaf
 	}
+	// vertical movement friction
 	pl.vy *= PHYS.gammaf
 	
+	let bi = Math.floor(pl.x)
+	let bj = Math.floor(pl.y - PHYS.uh / 2)
+	
 	// tileentity collision
-	let te = getTileEntityAt(pl.x, pl.y - PHYS.uh / 2)
+	let te = getTileEntity(bi, bj)
 	if (te) {
 		if (te.collect) {
-			g.score += te.score
+			pl.score += te.score
 			destroyTileEntity(te)
+		}
+	}
+	
+	// foreground uncover
+	let bpos = getValidIndex(bi, bj)
+	let fg = map.fgData[bpos]
+	let fgCurr = map.fgDataCurr[bpos]
+	if (map.fgEntrance) {
+		if (fg === 0) {
+			mapFloodFill(map.fgEntrance,
+				(i, j) => map.fgDataCurr[index(i, j)] === 0 && map.fgData[index(i, j)] !== 0,
+				(i, j) => {
+					map.fgDataCurr[index(i, j)] = map.fgData[index(i, j)]
+					renderTileGlobal(i, j)
+				})
+			map.fgEntrance = null
+		}
+	} else {
+		if (fgCurr !== 0) {
+			map.fgEntrance = [bi, bj]
+			mapFloodFill(map.fgEntrance,
+				(i, j) => map.fgDataCurr[index(i, j)] !== 0,
+				(i, j) => {
+					map.fgDataCurr[index(i, j)] = 0
+					renderTileGlobal(i, j)
+				})
 		}
 	}
 }
