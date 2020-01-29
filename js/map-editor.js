@@ -196,9 +196,8 @@ function mapInteract(x, y, button) {
 }
 
 function resetTileCache(i, j, blockUpdate) {
-	renderTileGlobal(i, j)
+	requestTileUpdate(i, j, blockUpdate)
 	if (blockUpdate) {
-		renderTileGlobal(i, j + 1)
 		if (isMapEdge(i, j)) tileCache = null
 	}
 }
@@ -265,6 +264,13 @@ function createEditorGUI() {
 	let guiContainer = document.createElement('div')
 	guiContainer.id = 'gui-container'
 	
+	function addComment(text) {
+		let p = document.createElement('p')
+		p.textContent = text
+		guiContainer.appendChild(p)
+	}
+	
+	addComment('Brush type:')
 	let selMode = document.createElement('select')
 	for (let mode in editor.availableModes) {
 		let opt = document.createElement('option')
@@ -276,6 +282,7 @@ function createEditorGUI() {
 	selMode.onchange = () => editor.mode = selMode.value
 	guiContainer.appendChild(selMode)
 	
+	addComment('Selected block:')
 	let selBlock = document.createElement('select')
 	for (let b = 0; b < blockInfo.length; b++) {
 		let info = blockInfo[b]
@@ -290,6 +297,7 @@ function createEditorGUI() {
 	selBlock.onchange = () => editor.block = selBlock.value
 	guiContainer.appendChild(selBlock)
 	
+	addComment('Selected tile entity:')
 	let selTE = document.createElement('select')
 	for (let name in editor.availableTileEntityCodes) {
 		let opt = document.createElement('option')
@@ -300,6 +308,7 @@ function createEditorGUI() {
 	selTE.onchange = () => editor.tileEntityCode = selTE.value
 	guiContainer.appendChild(selTE)
 	
+	addComment('Load from file:')
 	let btOpen = document.createElement('input')
 	btOpen.type = 'file'
 	btOpen.onchange = function() {
@@ -340,6 +349,7 @@ function createEditorGUI() {
 	btSave.value = 'Save map as file'
 	guiContainer.appendChild(btSave)
 	
+	addComment('Map name:')
 	let lvlNameInput = document.createElement('input')
 	lvlNameInput.type = 'text'
 	lvlNameInput.value = 'lvl1'
@@ -356,11 +366,15 @@ function createEditorGUI() {
 	btLoad.value = 'Load game lvl by name'
 	guiContainer.appendChild(btLoad)
 	
+	// disable event processing by the game controls
+	for (let name of ['keydown', 'keyup']) {
+		lvlNameInput.addEventListener('keydown', (e) => e.stopPropagation())
+	}
+	
 	document.body.appendChild(guiContainer)
 }
 
 createEditorGUI()
-startEditor()
 
 function generateId() {
 	const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'

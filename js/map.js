@@ -39,14 +39,14 @@ function destroyTileEntity(te) {
 	if (!te) return
 	map.tileEntityList = map.tileEntityList.filter((z) => (z != te))
 	map.tileEntityMap.delete(te.x + '_' + te.y)
-	renderTileGlobal(te.x, te.y)
+	requestTileUpdate(te.x, te.y)
 }
 
 function addTileEntity(te) {
 	if (!te) return
 	map.tileEntityList.push(te)
 	map.tileEntityMap.set(te.x + '_' + te.y, te)
-	renderTileGlobal(te.x, te.y)
+	requestTileUpdate(te.x, te.y)
 }
 
 function mapFloodFill(start, condition, callback) {

@@ -143,7 +143,7 @@ function processPhysics() {
 				(i, j) => map.fgDataCurr[index(i, j)] === 0 && map.fgData[index(i, j)] !== 0,
 				(i, j) => {
 					map.fgDataCurr[index(i, j)] = map.fgData[index(i, j)]
-					renderTileGlobal(i, j)
+					requestTileUpdate(i, j, true)
 				})
 			map.fgEntrance = null
 		}
@@ -154,7 +154,7 @@ function processPhysics() {
 				(i, j) => map.fgDataCurr[index(i, j)] !== 0,
 				(i, j) => {
 					map.fgDataCurr[index(i, j)] = 0
-					renderTileGlobal(i, j)
+					requestTileUpdate(i, j, true)
 				})
 		}
 	}

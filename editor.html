@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Boredomia Editor</title>
-<link href="editor-gui.css" rel="stylesheet" type="text/css">
+<!--<link href="editor-gui.css" rel="stylesheet" type="text/css">-->
 <!--
 <meta name="description" content="ETO SAUAUBSHENNEEE TAUZHE DAUCUZYWAET, TCHTO RANNDAUM NERANNDAUMMENN">
 <meta property="og:title" content="CUSTEETEEZACCEEIA RANNDAUMMKEE NEEEZBEZHNNA">
@@ -31,10 +31,20 @@ body {
 
 #gui-container {
 	position: fixed;
-	top: 0;
-	left: 0;
-	width: 0;
-	height: 0;
+	top: 0.4em;
+	left: 0.4em;
+	width: 250px;
+	max-width: 50vw;
+    font-size: 0.9em;
+    background: #fff3;
+}
+#gui-container p {
+    margin-top: 0.3em;
+    margin-bottom: 0;
+}
+#gui-container select, #gui-container input {
+    font-size: 1em;
+    display: block;
 }
 </style>
 </head>
@@ -50,7 +60,7 @@ body {
 <script src="js/map-editor.js"></script>
 <script src="js/game.js"></script>
 <script>
-loadRes()
+loadRes(() => startEditor())
 </script>
 </body>
 </html>

@@ -1,9 +1,6 @@
 const canv = document.getElementById('c', {alpha: false})
 const bm = canv.getContext('2d')
 
-// to remove text spikes
-bm.miterLimit = 1
-
 // width and height of main canvas
 let w = 0
 let h = 0
@@ -53,6 +50,9 @@ function resize() {
 
 
 function redraw() {
+	// remove text spikes
+	bm.miterLimit = 1
+	
     if (!g || !pl) {
 		bm.fillStyle = '#ccc'
         bm.fillRect(0, 0, canv.width, canv.height)
@@ -106,67 +106,63 @@ function renderTileGrid(bm, cx, cy) {
 		tileCache = {tcw2, tch2, fcx, fcy}
 		tileCache.canv = document.createElement('canvas')
 		tileCache.bm = tileCache.canv.getContext('2d', {alpha: false})
-		tileCache.canv.width = (2 * tcw2 + 1) * tsz
-		tileCache.canv.height = (2 * tch2 + 1) * tsz
-		
-		for (let j = -tch2; j <= tch2; j++) {
-			for (let i = -tcw2; i <= tcw2; i++) {
-				renderTile(i, j)
-			}
-		}
+		tileCache.w = 2 * tcw2 + 1
+		tileCache.h = 2 * tch2 + 1
+		tileCache.canv.width = tileCache.w * tsz
+		tileCache.canv.height = tileCache.h * tsz
+		tileCache.update = new Uint8ClampedArray(tileCache.w * tileCache.h)
+		tileCache.update.fill(1)
 	}
 	
-	if (tileCache.fcx != fcx || tileCache.fcy != fcy) {
+	let dcx = fcx - tileCache.fcx
+	let dcy = fcy - tileCache.fcy
+	
+	if (dcx || dcy) {
 		tileCache.bm.drawImage(tileCache.canv, (tileCache.fcx - fcx) * tsz, (tileCache.fcy - fcy) * tsz)
-		let ofcx = tileCache.fcx
-		let ofcy = tileCache.fcy
 		tileCache.fcx = fcx
 		tileCache.fcy = fcy
-		while (ofcx < fcx) {
-			let i = tcw2
-			for (let j = -tch2; j <= tch2; j++) renderTile(i, j)
-			ofcx++
-		}
-		while (ofcx > fcx) {
-			let i = -tcw2
-			for (let j = -tch2; j <= tch2; j++) renderTile(i, j)
-			ofcx--
-		}
-		while (ofcy < fcy) {
-			let j = tch2
-			for (let i = -tcw2; i <= tcw2; i++) renderTile(i, j)
-			ofcy++
-		}
-		while (ofcy > fcy) {
-			let j = -tch2
-			for (let i = -tcw2; i <= tcw2; i++) renderTile(i, j)
-			ofcy--
+	}
+	
+	for (let j = 0; j < tileCache.h; j++) {
+		for (let i = 0; i < tileCache.w; i++) {
+			let ni = i + dcx
+			let nj = j + dcy
+			let shouldRender =
+				ni < 0 || ni >= tileCache.w ||
+				nj < 0 || nj >= tileCache.h ||
+			    tileCache.update[nj * tileCache.w + ni]
+			if (shouldRender) renderTile(i, j)
 		}
 	}
+	tileCache.update.fill(0)
 	
 	let x = Math.round(w2 - (cx - fcx + tcw2) * tsz)
 	let y = Math.round(h2 - (cy - fcy + tch2) * tsz)
 	bm.drawImage(tileCache.canv, x, y)
 }
 
-function renderTileGlobal(bi, bj) {
+function requestTileUpdate(bi, bj, blockUpdate) {
 	if (!tileCache) return
 	let i = bi - tileCache.fcx
 	let j = bj - tileCache.fcy
-	if (Math.abs(i) <= tileCache.tcw2 && Math.abs(j) <= tileCache.tch2) renderTile(i, j)
-	if (blockSolid[getBlock(bi, bj + 1)]) {
+	if (Math.abs(i) <= tileCache.tcw2 && Math.abs(j) <= tileCache.tch2) {
+		tileCache.update[(j + tileCache.tch2) * tileCache.w + (i + tileCache.tcw2)] = 1
+	}
+	if (blockUpdate) {
 		j += 1
-		if (Math.abs(i) <= tileCache.tcw2 && Math.abs(j) <= tileCache.tch2) renderTile(i, j)
+		if (Math.abs(i) <= tileCache.tcw2 && Math.abs(j) <= tileCache.tch2) {
+			tileCache.update[(j + tileCache.tch2) * tileCache.w + (i + tileCache.tcw2)] = 1
+		}
 	}
 }
 
 function renderTile(i, j) {
 	let bm = tileCache.bm
-	let bi = i + tileCache.fcx
-	let bj = j + tileCache.fcy
+	let bi = i - tileCache.tcw2 + tileCache.fcx
+	let bj = j - tileCache.tch2 + tileCache.fcy
 	let bpos = getValidIndex(bi, bj)
-	let x = (i + tileCache.tcw2) * tsz
-	let y = (j + tileCache.tch2) * tsz
+	let x = i * tsz
+	let y = j * tsz
 	
 	let b = g.editor ? map.blData[bpos] : map.fgDataCurr[bpos] || map.blData[bpos]
 	let color = blockColor[b]
