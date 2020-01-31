@@ -14,6 +14,9 @@ const PHYS = {
 	ulw: 0.2,       // landing width
 	jumpcd: 20,     // jump cooldown ticks
 	edflyv: 0.5,    // editor fly speed
+	zoombase: 1.1,  // editor zoom base
+	zoommin: 1,     // editor zoom limit
+	zoommax: 4,     // editor zoom limit
 	eps: 0.01,      // epsilon, a small number for offsets
 }
 
@@ -31,6 +34,13 @@ function processPhysics() {
 	if (g.editor) {
 		pl.x += PHYS.edflyv * inp.x
 		pl.y -= PHYS.edflyv * inp.y
+		
+		if (inp.zoom) {
+			zoom *= PHYS.zoombase ** inp.zoom
+			zoom = Math.min(Math.max(PHYS.zoommin, zoom), PHYS.zoommax)
+			resize()
+		}
+		
 		return
 	}
 	// game physics
@@ -51,7 +61,7 @@ function processPhysics() {
 		pl.jumpCooldown = PHYS.jumpcd
 	}
 	
-	if (!pl.vx && !pl.vy && !inp.x && !inp.y && pl.ground) {
+	if (!pl.vx && !pl.vy && !inp.x && !inp.y && pl.ground && !inp.action) {
 		// no motion at all
 		return
 	}
@@ -126,10 +136,20 @@ function processPhysics() {
 	
 	// tileentity collision
 	let te = getTileEntity(bi, bj)
+	if (!te || te.type != 'portal') {
+		pl.portalImmune = false
+	}
 	if (te) {
 		if (te.collect) {
 			pl.score += te.score
 			destroyTileEntity(te)
+		} else {
+			tryEnterPortal(te)
+			if (te.type === 'sign' && inp.action) {
+				// alert is to be replaced with an appropriate way of displaying
+				resetControls()
+				alert(te.text)
+			}
 		}
 	}
 	
@@ -138,7 +158,8 @@ function processPhysics() {
 	let fg = map.fgData[bpos]
 	let fgCurr = map.fgDataCurr[bpos]
 	if (map.fgEntrance) {
-		if (fg === 0) {
+		// leave hidden area
+		if (fg === 0 || fgCurr !== 0) {
 			mapFloodFill(map.fgEntrance,
 				(i, j) => map.fgDataCurr[index(i, j)] === 0 && map.fgData[index(i, j)] !== 0,
 				(i, j) => {
@@ -147,7 +168,9 @@ function processPhysics() {
 				})
 			map.fgEntrance = null
 		}
-	} else {
+	}
+	if (!map.fgEntrance) {
+		// enter hidden area
 		if (fgCurr !== 0) {
 			map.fgEntrance = [bi, bj]
 			mapFloodFill(map.fgEntrance,
@@ -158,4 +181,32 @@ function processPhysics() {
 				})
 		}
 	}
+}
+
+function tryEnterPortal(te) {
+	if (te.type !== 'portal') return
+	if (pl.portalImmune) return
+	if (!te.lvl || !te.dest) return
+	
+	let lvlName = te.lvl
+	let destId = te.dest
+	
+	let newMap = map
+	if (lvlName != '@') {
+		if (!lvls[te.lvl]) return
+		newMap = loadMap(lvls[te.lvl])
+	}
+	let destTE = newMap.tileEntityList.find((te) => te.id == destId)
+	if (!destTE) {
+		console.error('no destination found', te.lvl, te.dest)
+		return
+	}
+	
+	//pl.x = pl.x - te.x + destTE.x
+	//pl.y = pl.y - te.y + destTE.y
+	pl.x = destTE.x + 0.5
+	pl.y = destTE.y + 1
+	pl.portalImmune = true
+	if (lvlName != '@') map = newMap
+	requestFullTileUpdate()
 }

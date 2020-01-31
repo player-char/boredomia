@@ -65,18 +65,19 @@ function mapFloodFill(start, condition, callback) {
 }
 
 function loadMap(lvlData) {
-	map = JSON.parse(lvlData)
+	let map = JSON.parse(lvlData)
 	for (let prop of ['blData', 'bgData', 'fgData']) {
 		map[prop] = Uint8ClampedArray.from(map[prop])
 	}
 	preprocessMap(map)
+	return map
 }
 
 function createEmptyMap() {
-	map = {
-		w: 10,
-		h: 10,
-		defaultPlayerPos: {x: 4.5, y: 6, dir: 0},
+	let map = {
+		w: 5,
+		h: 5,
+		defaultPlayerPos: {x: 2.5, y: 3, dir: 0},
 		tileEntityList: [],
 	}
 	for (let prop of ['blData', 'bgData', 'fgData']) {
@@ -84,6 +85,7 @@ function createEmptyMap() {
 		map[prop].fill(0)
 	}
 	preprocessMap(map)
+	return map
 }
 
 function preprocessMap(map) {
@@ -100,12 +102,10 @@ function preprocessMap(map) {
 	for (let te of map.tileEntityList) {
 		if (te.type !== 'portal') continue
 		let lvlName = te.lvl
-		let destId = te.destination
+		let destId = te.dest
 		if (!lvlName || !destId) continue
 		loadLvl(lvlName)
 	}
-	
-	tileCache = null
 }
 
 function index(i, j) {

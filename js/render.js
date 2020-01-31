@@ -19,12 +19,13 @@ const camYOffset = -1
 const diagSize = 375
 
 let renderQuality = 5
+let zoom = 1
 
 function resize() {
 	w = window.innerWidth * devicePixelRatio
 	h = window.innerHeight * devicePixelRatio
 	let k = diagSize / Math.hypot(w, h)
-	tsz = tszInitial
+	tsz = Math.ceil(tszInitial / zoom)
 	
 	// increase quality
 	for (let i = 0; i < renderQuality; i++) {
@@ -111,13 +112,18 @@ function renderTileGrid(bm, cx, cy) {
 		tileCache.canv.width = tileCache.w * tsz
 		tileCache.canv.height = tileCache.h * tsz
 		tileCache.update = new Uint8ClampedArray(tileCache.w * tileCache.h)
-		tileCache.update.fill(1)
+		tileCache.updateAll = true
 	}
 	
 	let dcx = fcx - tileCache.fcx
 	let dcy = fcy - tileCache.fcy
 	
-	if (dcx || dcy) {
+	if (tileCache.updateAll) {
+		dcx = 0
+		dxy = 0
+		tileCache.fcx = fcx
+		tileCache.fcy = fcy
+	} else if (dcx || dcy) {
 		tileCache.bm.drawImage(tileCache.canv, (tileCache.fcx - fcx) * tsz, (tileCache.fcy - fcy) * tsz)
 		tileCache.fcx = fcx
 		tileCache.fcy = fcy
@@ -127,7 +133,7 @@ function renderTileGrid(bm, cx, cy) {
 		for (let i = 0; i < tileCache.w; i++) {
 			let ni = i + dcx
 			let nj = j + dcy
-			let shouldRender =
+			let shouldRender = tileCache.updateAll ||
 				ni < 0 || ni >= tileCache.w ||
 				nj < 0 || nj >= tileCache.h ||
 			    tileCache.update[nj * tileCache.w + ni]
@@ -135,6 +141,7 @@ function renderTileGrid(bm, cx, cy) {
 		}
 	}
 	tileCache.update.fill(0)
+	tileCache.updateAll = false
 	
 	let x = Math.round(w2 - (cx - fcx + tcw2) * tsz)
 	let y = Math.round(h2 - (cy - fcy + tch2) * tsz)
@@ -154,6 +161,11 @@ function requestTileUpdate(bi, bj, blockUpdate) {
 			tileCache.update[(j + tileCache.tch2) * tileCache.w + (i + tileCache.tcw2)] = 1
 		}
 	}
+}
+
+function requestFullTileUpdate() {
+	if (!tileCache) return
+	tileCache.updateAll = true
 }
 
 function renderTile(i, j) {

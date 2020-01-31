@@ -26,13 +26,13 @@ let editor = {
 		cake:       '{"type":"score","sprite":"🍰","collect":true,"score":50}',
 		clover:     '{"type":"score","sprite":"🍀","collect":true,"score":100}',
 		
-		door:       '{"type":"portal","sprite":"woodendoor"}',
-		warp:       '{"type":"portal","sprite":"warp"}',
-		cave:       '{"type":"portal","sprite":"cavedoor"}',
+		door:       '{"type":"portal","lvl":"","dest":"","sprite":"woodendoor"}',
+		warp:       '{"type":"portal","lvl":"","dest":"","sprite":"warp"}',
+		cave:       '{"type":"portal","lvl":"","dest":"","sprite":"cavedoor"}',
 		
-		signpost:   '{"type":"sign","sprite":"signpost"}',
-		signwall:   '{"type":"sign","sprite":"signwall"}',
-		signrock:   '{"type":"sign","sprite":"signrock"}',
+		signpost:   '{"type":"sign","text":"","sprite":"signpost"}',
+		signwall:   '{"type":"sign","text":"","sprite":"signwall"}',
+		signrock:   '{"type":"sign","text":"","sprite":"signrock"}',
 	},
 	block: 3,
 	button: 0,
@@ -72,16 +72,16 @@ function startEditor(lvlData) {
 		editor: true,
 	}
 	if (lvlData) {
-		loadMap(lvlData)
+		map = loadMap(lvlData)
 	} else {
-		createEmptyMap()
+		map = createEmptyMap()
 	}
 	pl = {
         x: map.defaultPlayerPos.x,
 		y: map.defaultPlayerPos.y,
 		alive: true,
 	}
-	tileCache = null
+	requestFullTileUpdate()
 	editor.canInteract = true
 }
 
@@ -111,6 +111,13 @@ function mouseInteract(event, primary) {
 	mapInteract(x, y, editor.button, primary)
 }
 
+function editorPrompt(text, value) {
+	// events are missed during prompt so reset state manually
+	editor.mouseActive = false
+	resetControls()
+	return prompt(text, value)
+}
+
 function mapInteract(x, y, button) {
 	let i = Math.floor(x)
 	let j = Math.floor(y)
@@ -121,7 +128,7 @@ function mapInteract(x, y, button) {
 		let arr = map[mode + 'Data']
 		if (button == 1) {
 			// block pick
-			editor.block = arr[index(i, j)]
+			editor.selectBlock(arr[index(i, j)])
 			return
 		}
 		let value = (button == 2) ? 0 : editor.block
@@ -142,14 +149,12 @@ function mapInteract(x, y, button) {
 		let code = editor.tileEntityCode
 		if (mode == 'teedit') {
 			if (!te) return
-			// mouse events are missed during prompt so reset mouse state manually
-			editor.mouseActive = false
-			code = prompt('Edit tileEntity code:', JSON.stringify(te))
+			code = editorPrompt('Edit tileEntity code:', JSON.stringify(te))
 			if (!code) return
 		} else {
 			if (button == 1) {
 				// pick
-				if (te) editor.tileEntityCode = JSON.stringify(te)
+				if (te) editor.selectTE(JSON.stringify(te))
 				return
 			}
 			if (button == 2) {
@@ -164,7 +169,12 @@ function mapInteract(x, y, button) {
 		destroyTileEntity(te)
 		teNew.x = i
 		teNew.y = j
-		if (teNew.type === 'portal') {
+		for (let prop in teNew) {
+			if (teNew[prop] === '') {
+				teNew[prop] = editorPrompt('Enter "' + prop + '" of new tile entity:', '') || ''
+			}
+		}
+		if (teNew.type === 'portal' && !teNew.id) {
 			teNew.id = generateId()
 		}
 		addTileEntity(teNew)
@@ -198,7 +208,7 @@ function mapInteract(x, y, button) {
 function resetTileCache(i, j, blockUpdate) {
 	requestTileUpdate(i, j, blockUpdate)
 	if (blockUpdate) {
-		if (isMapEdge(i, j)) tileCache = null
+		if (isMapEdge(i, j)) requestFullTileUpdate()
 	}
 }
 
@@ -257,6 +267,7 @@ function resizeMap(dx, dy, nw, nh) {
 	map.defaultPlayerPos.y = j + 1
 	
 	preprocessMap(map)
+	requestFullTileUpdate()
 }
 
 
@@ -279,7 +290,9 @@ function createEditorGUI() {
 		selMode.appendChild(opt)
 	}
 	selMode.value = editor.mode
-	selMode.onchange = () => editor.mode = selMode.value
+	selMode.onchange = () => {
+		editor.selectMode(selMode.value)
+	}
 	guiContainer.appendChild(selMode)
 	
 	addComment('Selected block:')
@@ -294,7 +307,12 @@ function createEditorGUI() {
 		selBlock.appendChild(opt)
 	}
 	selBlock.value = editor.block
-	selBlock.onchange = () => editor.block = selBlock.value
+	selBlock.onchange = () => {
+		editor.selectBlock(selBlock.value)
+		if (!(['bl', 'bg', 'fg'].includes(editor.mode))) {
+			editor.selectMode('bl')
+		}
+	}
 	guiContainer.appendChild(selBlock)
 	
 	addComment('Selected tile entity:')
@@ -305,7 +323,10 @@ function createEditorGUI() {
 		opt.textContent = name
 		selTE.appendChild(opt)
 	}
-	selTE.onchange = () => editor.tileEntityCode = selTE.value
+	selTE.onchange = () => {
+		editor.selectTE(selTE.value)
+		editor.selectMode('tedraw')
+	}
 	guiContainer.appendChild(selTE)
 	
 	addComment('Load from file:')
@@ -372,6 +393,19 @@ function createEditorGUI() {
 	}
 	
 	document.body.appendChild(guiContainer)
+	
+	editor.selectMode = function(value) {
+		editor.mode = value
+		selMode.value = value
+	}
+	editor.selectBlock = function(value) {
+		editor.block = value
+		selBlock.value = value
+	}
+	editor.selectTE = function(value) {
+		editor.tileEntityCode = value
+		selTE.value = value
+	}
 }
 
 createEditorGUI()

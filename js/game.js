@@ -6,16 +6,15 @@ const tickDelay = 20
 
 window.onresize = resize
 resize()
-loadRes()
 
 function startGame(lvlName) {
 	loadLvl(lvlName).then(() => {
 		g = {
 			editor: false,
-			lvlName: lvlName,
 		}
-		loadMap(lvls[lvlName])
+		map = loadMap(lvls[lvlName])
 		initPlayer()
+		requestFullTileUpdate()
 	})
 }
 
@@ -31,13 +30,14 @@ function initPlayer() {
 		alive: true,
 		bored: false,
 		score: 0,
+		portalImmune: false,
     }
 }
 
 function processGameLogic() {
-	if (pl.x > map.w - 2) {
-		pl.bored = true
-	}
+	//if (pl.x > map.w - 2) {
+	//	pl.bored = true
+	//}
 }
 
 let debug = {
