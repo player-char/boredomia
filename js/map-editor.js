@@ -68,9 +68,6 @@ canv.addEventListener('blur', (event) => {
 })
 
 function startEditor(lvlData) {
-	g = {
-		editor: true,
-	}
 	if (lvlData) {
 		map = loadMap(lvlData)
 	} else {
@@ -80,6 +77,7 @@ function startEditor(lvlData) {
         x: map.defaultPlayerPos.x,
 		y: map.defaultPlayerPos.y,
 		alive: true,
+		editor: true,
 	}
 	requestFullTileUpdate()
 	editor.canInteract = true
@@ -174,7 +172,7 @@ function mapInteract(x, y, button) {
 				teNew[prop] = editorPrompt('Enter "' + prop + '" of new tile entity:', '') || ''
 			}
 		}
-		if (teNew.type === 'portal' && !teNew.id) {
+		if (requiresId(teNew) && !teNew.id) {
 			teNew.id = generateId()
 		}
 		addTileEntity(teNew)

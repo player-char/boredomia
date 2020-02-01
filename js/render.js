@@ -13,6 +13,7 @@ let tsz3 = 0
 let tsz4 = 0
 
 let tileCache = null
+let screenRendered = false
 
 const tszInitial = 16
 const camYOffset = -1
@@ -20,6 +21,8 @@ const diagSize = 375
 
 let renderQuality = 5
 let zoom = 1
+
+let renderTime = 0
 
 function resize() {
 	w = window.innerWidth * devicePixelRatio
@@ -46,15 +49,26 @@ function resize() {
     canv.width = w
     canv.height = h
 	tileCache = null // invalidate cache
-    redraw()
+	screenRendered = false
+    //renderScreen()
 }
 
+function tryRender() {
+	if (!screenRendered) {
+		let t = performance.now()
+		renderScreen()
+		renderTime += performance.now() - t
+		if (debug.show) renderDebug(debug)
+		screenRendered = true
+	}
+	window.requestAnimationFrame(tryRender)
+}
 
-function redraw() {
+function renderScreen() {
 	// remove text spikes
 	bm.miterLimit = 1
 	
-    if (!g || !pl) {
+    if (!pl) {
 		bm.fillStyle = '#ccc'
         bm.fillRect(0, 0, canv.width, canv.height)
 		renderMessage(bm, 'ИДЁТ ЗАЙГРУЗКА...', w2, h2)
@@ -65,7 +79,7 @@ function redraw() {
 	let cy = pl.y + camYOffset
 	
 	renderTileGrid(bm, cx, cy)
-	if (g.editor) {
+	if (pl.editor) {
 		// render some editor gui here
 		
 		// map bounds
@@ -75,11 +89,11 @@ function redraw() {
 		
 		let xPlayerOffset = (map.defaultPlayerPos.x - pl.x) * tsz
 		let yPlayerOffset = (map.defaultPlayerPos.y - pl.y) * tsz
-		renderOrangeC(bm, xPlayerOffset + w2-tsz2, yPlayerOffset + h2+tsz4, tsz, tsz, map.defaultPlayerPos.dir, false)
+		renderOrangeC(bm, xPlayerOffset + w2-tsz2, yPlayerOffset + h2+tsz4, tsz, map.defaultPlayerPos.dir, false)
 		
 		return
 	}
-	renderOrangeC(bm, w2-tsz2, h2+tsz4, tsz, tsz, pl.dir, pl.bored)
+	renderOrangeC(bm, w2-tsz2, h2+tsz4, tsz, pl.dir, pl.bored)
 	
 	bm.font = tsz2 + 'px sans-serif'
 	bm.textAlign = 'left'
@@ -90,9 +104,9 @@ function redraw() {
 	strokeFillText(bm, 'Score: ' + pl.score, 10, 10)
 	
     if (!pl.alive) {
-		renderMessage(bm, 'Press F5 to pay respects.', w2, h2 / 2)
+		renderMessage(bm, 'Press R to restart', w2, h2 / 2)
     } else if (pl.bored) {
-		renderMessage(bm, 'Boring...', w2, h2 / 2)
+		renderMessage(bm, 'level not ready = game boring', w2, h2 / 2)
     }
 }
 
@@ -105,12 +119,10 @@ function renderTileGrid(bm, cx, cy) {
 	let tch2 = Math.ceil(h2 / tsz)
 	if (!tileCache) {
 		tileCache = {tcw2, tch2, fcx, fcy}
-		tileCache.canv = document.createElement('canvas')
-		tileCache.bm = tileCache.canv.getContext('2d', {alpha: false})
 		tileCache.w = 2 * tcw2 + 1
 		tileCache.h = 2 * tch2 + 1
-		tileCache.canv.width = tileCache.w * tsz
-		tileCache.canv.height = tileCache.h * tsz
+		tileCache.canv = createCanvas(tileCache.w * tsz, tileCache.h * tsz)
+		tileCache.bm = tileCache.canv.getContext('2d', {alpha: false})
 		tileCache.update = new Uint8ClampedArray(tileCache.w * tileCache.h)
 		tileCache.updateAll = true
 	}
@@ -176,7 +188,7 @@ function renderTile(i, j) {
 	let x = i * tsz
 	let y = j * tsz
 	
-	let b = g.editor ? map.blData[bpos] : map.fgDataCurr[bpos] || map.blData[bpos]
+	let b = pl.editor ? map.blData[bpos] : map.fgDataCurr[bpos] || map.blData[bpos]
 	let color = blockColor[b]
 	
 	if (b === 0 || b === 1) {
@@ -201,7 +213,7 @@ function renderTile(i, j) {
 			renderTileEntity(bm, x, y, te)
 		}
 		
-		if (b === 1 && g.editor) {
+		if (b === 1 && pl.editor) {
 			renderTileFrame(bm, x, y, 5, 5, '#a00')
 		}
 	} else {
@@ -213,14 +225,14 @@ function renderTile(i, j) {
 		if (blockTopColor[b]) {
 			let ubpos = getValidIndex(bi, bj - 1)
 			let ub = map.blData[ubpos]
-			if (!blockTopColor[ub] && (map.fgDataCurr[ubpos] == 0 || g.editor)) {
+			if (!blockTopColor[ub] && (map.fgDataCurr[ubpos] == 0 || pl.editor)) {
 				bm.fillStyle = blockTopColor[b]
 				bm.fillRect(x, y, tsz, tsz3)
 			}
 		}
 	}
 	
-	if (g.editor) {
+	if (pl.editor) {
 		let b = map.fgData[bpos]
 		if (b !== 0) {
 			// render fg for editor
@@ -322,10 +334,12 @@ function renderTileFrame(bm, x, y, d, lw, color) {
 	bm.globalAlpha = 1
 }
 
-function renderOrangeC(bm, x, y, w, h, dir, bored) {
-    bm.drawImage(imgs['orangec' + dir], x, y, w, h)
+function renderOrangeC(bm, x, y, size, dir, bored) {
+	//bm.fillStyle = '#fa0'
+	//bm.fillRect(x, y, w, h)
+    bm.drawImage(getCachedSprite('orangec' + dir, size), x, y)
 	if (bored) {
-		bm.drawImage(imgs['bored' + dir], x, y, w, h)
+		bm.drawImage(getCachedSprite('bored' + dir, size), x, y)
 	}
 }
 
@@ -355,7 +369,7 @@ function renderDebug(debug) {
 	bm.globalAlpha = 1
 	
 	bm.lineWidth = 1
-	for (let [prop, color] of [['renderT', '#f00'], ['engineT', '#00f']]) {
+	for (let [prop, color] of [['renderTime', '#f00'], ['engineTime', '#00f']]) {
 		bm.strokeStyle = color
 		bm.beginPath()
 		for (let i = 0; i < debug.series.length; i++) {

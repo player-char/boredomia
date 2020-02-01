@@ -1,37 +1,17 @@
 let pl = null  // player data
-let g = null   // game status data
 let map = null // map data
 
-const tickDelay = 20
+const tickDelay = Math.floor(1000/60)
 
 window.onresize = resize
 resize()
 
 function startGame(lvlName) {
-	loadLvl(lvlName).then(() => {
-		g = {
-			editor: false,
-		}
-		map = loadMap(lvls[lvlName])
+	loadLvl(lvlName).then((data) => {
+		map = loadMap(data)
 		initPlayer()
 		requestFullTileUpdate()
 	})
-}
-
-function initPlayer() {
-    pl = {
-        dir: map.defaultPlayerPos.dir || 0,
-        x: map.defaultPlayerPos.x,
-		y: map.defaultPlayerPos.y,
-		vx: 0.0,
-		vy: 0.0,
-		jumpCooldown: 0,
-		ground: true,
-		alive: true,
-		bored: false,
-		score: 0,
-		portalImmune: false,
-    }
 }
 
 function processGameLogic() {
@@ -48,20 +28,21 @@ let debug = {
 
 function tick() {
 	let t = performance.now()
-	if (g && pl && pl.alive) {
-		processPhysics()
-		processGameLogic()
+	if (pl && pl.alive) {
+		let inputs = getKeyInputs()
+		processPhysics(inputs)
+		//processGameLogic()
 	}
-	let engineT = performance.now() - t
-	t = performance.now()
-	redraw()
-	let renderT = performance.now() - t
+	let engineTime = performance.now() - t
 	debug.series.unshift({
-		engineT, renderT
+		engineTime, renderTime
 	})
+	renderTime = 0
+	screenRendered = false
 	if (debug.series.length > debug.maxSize) debug.series.pop()
-	if (engineT > 5 || renderT > 5) console.log('Takes too long:', engineT, renderT)
-	if (debug.show) renderDebug(debug)
+	//if (engineTime > 5 || renderTime > 5) console.log('Takes too long:', engineT, renderT)
+	//if (debug.show) renderDebug(debug)
 }
 
 setInterval(tick, tickDelay)
+window.requestAnimationFrame(tryRender)

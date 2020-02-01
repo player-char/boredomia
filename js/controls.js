@@ -7,6 +7,7 @@ let availableKeys = [
 	
 	81 /* Q  */, 69 /* E */,
 	
+	112, /* F1 */
 	113, /* F2 */
 	114, /* F3 */
 	
@@ -60,11 +61,27 @@ function getKeyInputs() {
 
 function btDown(k) {
 	switch (k) {
+		case 112: // F1 - help
+			alert([
+				'------- Main controls --------',
+				'"WASD" = move ("W" = jump, "S" = go down)',
+				'"F" or "Enter" = action (read text on signs)',
+				'"R" = retry (restart from last level entrance)',
+				'------- Optional --------',
+				'"F3" = show debug info',
+				'"Q" and "E" = zoom (only in editor)',
+			].join('\n'))
+		break
 		case 113: // F2 - screenshot
 			//
 		break
 		case 114: // F3 - debug
 			debug.show = !debug.show
+		break
+		case 82: // R - retry
+			if (pl && pl.save) {
+				resetPlayer()
+			}
 		break
 	}
 }

@@ -49,6 +49,10 @@ function addTileEntity(te) {
 	requestTileUpdate(te.x, te.y)
 }
 
+function requiresId(te) {
+	return te.type === 'portal' || te.type === 'score'
+}
+
 function mapFloodFill(start, condition, callback) {
 	let queue = [start]
 	while (queue.length) {
@@ -64,12 +68,12 @@ function mapFloodFill(start, condition, callback) {
 	}
 }
 
-function loadMap(lvlData) {
+function loadMap(lvlData, progress) {
 	let map = JSON.parse(lvlData)
 	for (let prop of ['blData', 'bgData', 'fgData']) {
 		map[prop] = Uint8ClampedArray.from(map[prop])
 	}
-	preprocessMap(map)
+	preprocessMap(map, progress)
 	return map
 }
 
@@ -88,10 +92,21 @@ function createEmptyMap() {
 	return map
 }
 
-function preprocessMap(map) {
+function preprocessMap(map, progress) {
 	map.fgDataCurr = Uint8ClampedArray.from(map.fgData)
 	map.fgEntrance = null
 	map.area = map.w * map.h
+	
+	let idCounter = 0
+	for (let te of map.tileEntityList) {
+		if (requiresId(te) && !te.id) {
+			te.id = String(idCounter++)
+		}
+	}
+	
+	if (progress) {
+		map.tileEntityList = map.tileEntityList.filter((te) => !progress[map.name + ':' + te.id])
+	}
 	
 	map.tileEntityMap = new Map()
 	for (let te of map.tileEntityList) {
@@ -103,8 +118,8 @@ function preprocessMap(map) {
 		if (te.type !== 'portal') continue
 		let lvlName = te.lvl
 		let destId = te.dest
-		if (!lvlName || !destId) continue
-		loadLvl(lvlName)
+		if (!lvlName || !destId || lvlName == '@') continue
+		loadLvlInBackground(lvlName)
 	}
 }
 
