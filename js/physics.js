@@ -42,6 +42,7 @@ const PHYS = {
 	jumpv:    0.47   * timeFactor      , // jump start speed
 	maxvx:    0.5    * timeFactor      , // max horizontal speed
 	maxvy:    0.9375 * timeFactor      , // max vertical speed
+	ladderv:  0.1    * timeFactor      , // speed when on ladder
 	gammar:   0.8   ** timeFactor      , // ground non-friction
 	gammaf:   0.983 ** timeFactor      , // air non-friction
 	uh:       0.65                     , // height of player character
@@ -61,6 +62,11 @@ function isSolid(b) {
 
 function isDeadly(b) {
 	return b === 10
+}
+
+function isLadderAt(x, y) {
+	let te = getTileEntity(Math.floor(x), Math.floor(y))
+	return te && te.type == 'ladder'
 }
 
 function processPhysics(inputs) {
@@ -95,10 +101,21 @@ function processPhysics(inputs) {
 		pl.jumpCooldown = PHYS.jumpcd
 	}
 	
-	if (!pl.vx && !pl.vy && !inputs.x && !inputs.y && pl.ground && !inputs.action) {
-		// no motion at all
-		return
+	let onLadder = isLadderAt(pl.x, pl.y - PHYS.eps)
+	if (onLadder) {
+		if (pl.ground && inputs.y > 0) {
+			pl.ground = false
+		}
+		if (!pl.ground) {
+			pl.vx = inputs.x * PHYS.ladderv
+			pl.vy = -inputs.y * PHYS.ladderv
+		}
 	}
+	
+	//if (!pl.vx && !pl.vy && !inputs.x && !inputs.y && pl.ground && !inputs.action) {
+	//	// no motion at all
+	//	return
+	//}
 	let newx = pl.x + pl.vx
 	let newy = pl.y + pl.vy
 	

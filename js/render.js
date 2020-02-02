@@ -256,9 +256,12 @@ function renderTile(i, j) {
 }
 
 function renderTileEntity(bm, x, y, te) {
-	let mode = ''
-	let data = ''
 	if (te.sprite) {
+		if (!te.sprite.match(/^\w/)) {
+			// emoji
+			renderTextTileEntity(bm, x, y, te.sprite)
+			return
+		}
 		let tsz6 = Math.round(tsz / 6)
 		let tsz23 = Math.round(2 * tsz / 3)
 		let tsz34 = Math.round(3 * tsz / 4)
@@ -297,10 +300,11 @@ function renderTileEntity(bm, x, y, te) {
 				bm.fillRect(x + tsz6, y + tsz4, tsz23, tsz34)
 				bm.fillRect(x + tsz6 / 2, y + tsz2, tsz - tsz6, tsz2)
 			break
-			default:
-				// emoji or chars
-				mode = 'text'
-				data = te.sprite
+			case 'ladderwood':
+				bm.fillStyle = '#752'
+			break
+			case 'ladderiron':
+				bm.fillStyle = '#888'
 			break
 		}
 		if (te.sprite.startsWith('sign')) {
@@ -309,21 +313,25 @@ function renderTileEntity(bm, x, y, te) {
 				bm.fillRect(x + tsz4, y + tsz3 + tsz4 / 2 * k, tsz2, tsz6 / 3)
 			}
 			return
+		} else if (te.sprite.startsWith('ladder')) {
+			bm.fillRect(x, y, tsz6, tsz)
+			bm.fillRect(x + tsz - tsz6, y, tsz6, tsz)
+			for (let k = 0; k < 3; k++) {
+				bm.fillRect(x, y + Math.round(tsz6 * (2 * k + 0.5)), tsz, tsz6)
+			}
+			return
 		}
 	}
-	if (!mode) {
-		// unknown tile entity, render as a '?'
-		mode = 'text'
-		data = String.fromCharCode(0xFFFD)
-	}
-	
-	if (mode == 'text') {
-		bm.font = tsz2 + 'px sans-serif'
-		bm.textAlign = 'center'
-		bm.textBaseline = 'middle'
-		bm.fillStyle = '#000'
-		bm.fillText(data, x + tsz2, y + tsz2)
-	}
+	// unknown tile entity, render as a '?'
+	renderTextTileEntity(bm, x, y, String.fromCharCode(0xFFFD))
+}
+
+function renderTextTileEntity(bm, x, y, data) {
+	bm.font = tsz2 + 'px sans-serif'
+	bm.textAlign = 'center'
+	bm.textBaseline = 'middle'
+	bm.fillStyle = '#000'
+	bm.fillText(data, x + tsz2, y + tsz2)
 }
 
 function renderTileFrame(bm, x, y, d, lw, color) {

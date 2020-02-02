@@ -30,9 +30,12 @@ let editor = {
 		warp:       '{"type":"portal","lvl":"","dest":"","sprite":"warp"}',
 		cave:       '{"type":"portal","lvl":"","dest":"","sprite":"cavedoor"}',
 		
-		signpost:   '{"type":"sign","text":"","sprite":"signpost"}',
-		signwall:   '{"type":"sign","text":"","sprite":"signwall"}',
-		signrock:   '{"type":"sign","text":"","sprite":"signrock"}',
+		sign_post:   '{"type":"sign","text":"","sprite":"signpost"}',
+		sign_wall:   '{"type":"sign","text":"","sprite":"signwall"}',
+		sign_rock:   '{"type":"sign","text":"","sprite":"signrock"}',
+		
+		ladder_wood:   '{"type":"ladder","sprite":"ladderwood"}',
+		ladder_iron:   '{"type":"ladder","sprite":"ladderiron"}',
 	},
 	block: 3,
 	button: 0,
@@ -371,7 +374,7 @@ function createEditorGUI() {
 	addComment('Map name:')
 	let lvlNameInput = document.createElement('input')
 	lvlNameInput.type = 'text'
-	lvlNameInput.value = 'lvl1'
+	lvlNameInput.value = 'untitled'
 	guiContainer.appendChild(lvlNameInput)
 	
 	let btLoad = document.createElement('input')
