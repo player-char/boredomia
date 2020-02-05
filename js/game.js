@@ -28,7 +28,7 @@ let debug = {
 
 function tick() {
 	let t = performance.now()
-	if (pl && pl.alive) {
+	if (pl && pl.alive && !pl.paused) {
 		let inputs = getKeyInputs()
 		processPhysics(inputs)
 		//processGameLogic()
@@ -46,3 +46,7 @@ function tick() {
 
 setInterval(tick, tickDelay)
 window.requestAnimationFrame(tryRender)
+
+function launchGame() {
+	loadRes(() => startGame('lvl1'))
+}

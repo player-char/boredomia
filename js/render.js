@@ -1,5 +1,13 @@
-const canv = document.getElementById('c', {alpha: false})
-const bm = canv.getContext('2d')
+const canv = document.createElement('canvas')
+canv.style.maxWidth = '100vw'
+canv.style.maxHeight = '100vh'
+canv.style.display = 'block'
+canv.style.margin = '0 auto'
+canv.width = 0
+canv.height = 0
+document.body.appendChild(canv)
+
+const bm = canv.getContext('2d', {alpha: false})
 
 // width and height of main canvas
 let w = 0

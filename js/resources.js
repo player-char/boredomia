@@ -1,4 +1,3 @@
-let loader = document.getElementById('loader')
 let imgs = {
     'orangec0': null,
     'orangec1': null,
@@ -12,13 +11,26 @@ let cachedSprites = {}
 let lvls = {}
 
 function loadRes(callback) {
-    let imgsRequired = Object.keys(imgs).length
+	let loader = document.createElement('div')
+	loader.style.position = 'fixed'
+	loader.style.left = '100vw'
+	loader.style.top = '100vh'
+	document.body.appendChild(loader)
+	
+    let imgsRequired = 0
+    for (let imgName in imgs) {
+		if (imgs[imgName]) continue
+		imgsRequired++
+	}
 
     for (let imgName in imgs) {
+		if (imgs[imgName]) continue
         let i = document.createElement('img')
         i.onload = () => {
+			console.log('loaded ' + imgName)
 			loader.removeChild(i)
             if (--imgsRequired == 0) {
+				document.body.removeChild(loader)
 				if (callback) callback()
             }
         }
@@ -50,8 +62,12 @@ function loadLvl(lvlName) {
 	}
 	return fetch(`./lvls/${lvlName}.json`)
 		.then((response) => response.status == 200 ? response.text() : null)
-		.then(data => data && (`{"name":"${lvlName}",` + data.slice(1)))
+		.then(data => insertLvlName(data, lvlName))
 		.then(data => lvls[lvlName] = data)
+}
+
+function insertLvlName(data, name) {
+	return data && (`{"name":"${name}",` + data.slice(1))
 }
 
 function loadLvlInBackground(lvlName) {

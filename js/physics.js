@@ -202,8 +202,10 @@ function processPhysics(inputs) {
 			tryEnterPortal(te)
 			if (te.type === 'sign' && inputs.action) {
 				// alert is to be replaced with an appropriate way of displaying
-				resetControls()
-				alert(te.text)
+				let signColor = te.sprite != 'signrock' ? '#974' : '#666'
+				showSignMessage(te.text, signColor)
+				//resetControls()
+				//alert(te.text)
 			}
 		}
 	}

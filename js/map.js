@@ -77,21 +77,6 @@ function loadMap(lvlData, progress) {
 	return map
 }
 
-function createEmptyMap() {
-	let map = {
-		w: 5,
-		h: 5,
-		defaultPlayerPos: {x: 2.5, y: 3, dir: 0},
-		tileEntityList: [],
-	}
-	for (let prop of ['blData', 'bgData', 'fgData']) {
-		map[prop] = new Uint8ClampedArray(map.w * map.h)
-		map[prop].fill(0)
-	}
-	preprocessMap(map)
-	return map
-}
-
 function preprocessMap(map, progress) {
 	map.fgDataCurr = Uint8ClampedArray.from(map.fgData)
 	map.fgEntrance = null

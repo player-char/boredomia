@@ -36,10 +36,13 @@ let editor = {
 		
 		ladder_wood:   '{"type":"ladder","sprite":"ladderwood"}',
 		ladder_iron:   '{"type":"ladder","sprite":"ladderiron"}',
+		
+		checkpoint:   '{"type":"checkpoint","sprite":"🚩"}',
 	},
 	block: 3,
 	button: 0,
 	tileEntityCode: 'null',
+	preTesting: null,
 }
 
 canv.addEventListener('mousedown', (event) => {
@@ -86,7 +89,26 @@ function startEditor(lvlData) {
 	editor.canInteract = true
 }
 
-function saveMap() {
+function toggleGameTesting() {
+	if (!editor.preTesting) {
+		// start gameplay testing
+		editor.preTesting = {pl, map}
+		lvls[map.name] = insertLvlName(saveMap(map), map.name)
+		startGame(map.name)
+		editor.canInteract = false
+		editor.guiContainer.style.display = 'none'
+	} else {
+		// end gameplay testing, restore state
+		pl = editor.preTesting.pl
+		map = editor.preTesting.map
+		editor.preTesting = null
+		editor.canInteract = true
+		editor.guiContainer.style.display = ''
+	}
+	requestFullTileUpdate()
+}
+
+function saveMap(map) {
     let lvlData = {
         w: map.w,
         h: map.h,
@@ -100,6 +122,22 @@ function saveMap() {
     }
     
 	return JSON.stringify(lvlData)
+}
+
+function createEmptyMap() {
+	let map = {
+		w: 5,
+		h: 5,
+		name: 'empty',
+		defaultPlayerPos: {x: 2.5, y: 3, dir: 0},
+		tileEntityList: [],
+	}
+	for (let prop of ['blData', 'bgData', 'fgData']) {
+		map[prop] = new Uint8ClampedArray(map.w * map.h)
+		map[prop].fill(0)
+	}
+	preprocessMap(map)
+	return map
 }
 
 function mouseInteract(event, primary) {
@@ -338,8 +376,10 @@ function createEditorGUI() {
 		let fileReader = new FileReader()
 		fileReader.onloadend = () => {
 			try {
-				startEditor(fileReader.result)
-				lvlNameInput.value = file.name
+				let lvlName = file.name.replace(/.json$/, '')
+				let lvlData = insertLvlName(fileReader.result, lvlName)
+				startEditor(lvlData)
+				lvlNameInput.value = lvlName
 			} catch(err) {
 				alert('Failed to load lvl data: ' + err)
 			}
@@ -361,7 +401,7 @@ function createEditorGUI() {
 			alert('Map is not loaded!')
 			return
 		}
-		let lvlData = saveMap()
+		let lvlData = saveMap(map)
 		let lvlName = lvlNameInput.value
 		if (!lvlName) {
 			lvlName = 'untitled'
@@ -374,13 +414,20 @@ function createEditorGUI() {
 	addComment('Map name:')
 	let lvlNameInput = document.createElement('input')
 	lvlNameInput.type = 'text'
-	lvlNameInput.value = 'untitled'
+	lvlNameInput.oninput = function() {
+		map.name = this.value
+	}
+	//lvlNameInput.value = 'untitled'
 	guiContainer.appendChild(lvlNameInput)
+	// disable event processing by the game controls
+	for (let name of ['keydown', 'keyup']) {
+		lvlNameInput.addEventListener('keydown', (e) => e.stopPropagation())
+	}
 	
 	let btLoad = document.createElement('input')
 	btLoad.type = 'button'
 	btLoad.onclick = () => {
-		let lvlName = lvlNameInput.value
+		let lvlName = map.name
 		loadLvl(lvlName)
 			.then((data) => startEditor(data))
 			.catch((error) => alert('Cannot get "' + lvlName + '.json" from "lvls" folder! ' + error))
@@ -388,12 +435,18 @@ function createEditorGUI() {
 	btLoad.value = 'Load game lvl by name'
 	guiContainer.appendChild(btLoad)
 	
-	// disable event processing by the game controls
-	for (let name of ['keydown', 'keyup']) {
-		lvlNameInput.addEventListener('keydown', (e) => e.stopPropagation())
-	}
+	let btPlay = document.createElement('input')
+	btPlay.type = 'button'
+	btPlay.onclick = toggleGameTesting
+	btPlay.value = 'Toggle gameplay testing'
+	btPlay.style.position = 'fixed'
+	btPlay.style.top = '0'
+	btPlay.style.right = '0'
+	document.body.appendChild(btPlay)
 	
 	document.body.appendChild(guiContainer)
+	
+	editor.guiContainer = guiContainer
 	
 	editor.selectMode = function(value) {
 		editor.mode = value
@@ -435,4 +488,8 @@ function downloadFile(name, data) {
 		console.log(error)
 		window.open(data)
 	}
+}
+
+function launchEditor() {
+	loadRes(() => startEditor())
 }

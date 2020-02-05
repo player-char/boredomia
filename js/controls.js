@@ -83,5 +83,9 @@ function btDown(k) {
 				resetPlayer()
 			}
 		break
+		case 70: // F - action
+		case 13: // Enter - action
+			hideSignMessage()
+		break
 	}
 }
