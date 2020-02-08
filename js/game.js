@@ -14,12 +14,6 @@ function startGame(lvlName) {
 	})
 }
 
-function processGameLogic() {
-	//if (pl.x > map.w - 2) {
-	//	pl.bored = true
-	//}
-}
-
 let debug = {
 	series: [],
 	maxSize: 1000,
@@ -28,11 +22,7 @@ let debug = {
 
 function tick() {
 	let t = performance.now()
-	if (pl && pl.alive && !pl.paused) {
-		let inputs = getKeyInputs()
-		processPhysics(inputs)
-		//processGameLogic()
-	}
+	processGameTick()
 	let engineTime = performance.now() - t
 	debug.series.unshift({
 		engineTime, renderTime
@@ -40,8 +30,6 @@ function tick() {
 	renderTime = 0
 	screenRendered = false
 	if (debug.series.length > debug.maxSize) debug.series.pop()
-	//if (engineTime > 5 || renderTime > 5) console.log('Takes too long:', engineT, renderT)
-	//if (debug.show) renderDebug(debug)
 }
 
 setInterval(tick, tickDelay)

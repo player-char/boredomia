@@ -28,7 +28,7 @@ window.addEventListener('keydown', function(e) {
 		return
 	}
 	e.preventDefault()
-	if (kd.get(k) == 1) return
+	if (kd.get(k) != 0) return
 	kd.set(k, 1)
 	btDown(k)
 })
@@ -48,15 +48,19 @@ function resetControls() {
 	}
 }
 
+let actionFlag = 0
 function getKeyInputs() {
-	return {
+	let inputs = {
 		y: (kd.get(38) || kd.get(87)) - (kd.get(40) || kd.get(83)),
 		x: (kd.get(39) || kd.get(68)) - (kd.get(37) || kd.get(65)),
-		action: kd.get(70) || kd.get(13),
+		space: kd.get(32),
+		action: actionFlag,
 		retry: kd.get(82),
 		esc: kd.get(27),
 		zoom: kd.get(81) - kd.get(69),
 	}
+	actionFlag = 0
+	return inputs
 }
 
 function btDown(k) {
@@ -85,7 +89,7 @@ function btDown(k) {
 		break
 		case 70: // F - action
 		case 13: // Enter - action
-			hideSignMessage()
+			actionFlag = !hideSignMessage()
 		break
 	}
 }

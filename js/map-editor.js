@@ -1,11 +1,13 @@
 let editor = {
 	canInteract: false,
 	mouseActive: false,
-	mode: 'bl',
+	
 	availableModes: {
 		bl: 'draw solid blocks',
 		bg: 'draw background',
 		fg: 'draw foreground (occlusion layer)',
+		cave: 'draw caves (embed background)',
+		replace: 'replace tiles',
 		player: 'move default player position',
 		tedraw: 'draw tile entities',
 		teedit: 'edit tile entity data',
@@ -30,18 +32,23 @@ let editor = {
 		warp:       '{"type":"portal","lvl":"","dest":"","sprite":"warp"}',
 		cave:       '{"type":"portal","lvl":"","dest":"","sprite":"cavedoor"}',
 		
-		sign_post:   '{"type":"sign","text":"","sprite":"signpost"}',
-		sign_wall:   '{"type":"sign","text":"","sprite":"signwall"}',
-		sign_rock:   '{"type":"sign","text":"","sprite":"signrock"}',
+		sign_post:    '{"type":"sign","text":"","sprite":"signpost"}',
+		sign_wall:    '{"type":"sign","text":"","sprite":"signwall"}',
+		sign_rock:    '{"type":"sign","text":"","sprite":"signrock"}',
 		
-		ladder_wood:   '{"type":"ladder","sprite":"ladderwood"}',
-		ladder_iron:   '{"type":"ladder","sprite":"ladderiron"}',
+		ladder_wood:  '{"type":"ladder","sprite":"ladderwood"}',
+		ladder_iron:  '{"type":"ladder","sprite":"ladderiron"}',
 		
 		checkpoint:   '{"type":"checkpoint","sprite":"🚩"}',
+		death:        '{"type":"death","sprite":"none"}',
 	},
+	
+	mode: 'bl',
 	block: 3,
 	button: 0,
+	brushSize: 1,
 	tileEntityCode: 'null',
+	
 	preTesting: null,
 }
 
@@ -74,6 +81,11 @@ canv.addEventListener('blur', (event) => {
 })
 
 function startEditor(lvlData) {
+	if (map) {
+		if (!confirm('Are you sure? You may lose your current map!')) {
+			return
+		}
+	}
 	if (lvlData) {
 		map = loadMap(lvlData)
 	} else {
@@ -93,7 +105,7 @@ function toggleGameTesting() {
 	if (!editor.preTesting) {
 		// start gameplay testing
 		editor.preTesting = {pl, map}
-		lvls[map.name] = insertLvlName(saveMap(map), map.name)
+		putMapIntoLvls(map)
 		startGame(map.name)
 		editor.canInteract = false
 		editor.guiContainer.style.display = 'none'
@@ -101,11 +113,16 @@ function toggleGameTesting() {
 		// end gameplay testing, restore state
 		pl = editor.preTesting.pl
 		map = editor.preTesting.map
+		hideSignMessage()
 		editor.preTesting = null
 		editor.canInteract = true
 		editor.guiContainer.style.display = ''
 	}
 	requestFullTileUpdate()
+}
+
+function putMapIntoLvls(map) {
+	lvls[map.name] = insertLvlName(saveMap(map), map.name)
 }
 
 function saveMap(map) {
@@ -147,7 +164,20 @@ function mouseInteract(event, primary) {
 	if (x < 0 || y < 0 || x >= 1 || y >= 1) return
 	x = (x * w - w2) / tsz + pl.x
 	y = (y * h - h2) / tsz + pl.y + camYOffset
-	mapInteract(x, y, editor.button, primary)
+	
+	let brushSizeUnsupported = ['player', 'resize', 'teedit'].includes(editor.mode)
+	
+	if (editor.brushSize == 1 || brushSizeUnsupported) {
+		mapInteract(x, y, editor.button, primary)
+	} else {
+		let bs = editor.brushSize
+		let delta = (bs - 1) / 2
+		for (let dy = 0; dy < bs; dy++) {
+			for (let dx = 0; dx < bs; dx++) {
+				mapInteract(x - delta + dx, y - delta + dy, editor.button, primary)
+			}
+		}
+	}
 }
 
 function editorPrompt(text, value) {
@@ -173,6 +203,33 @@ function mapInteract(x, y, button) {
 		let value = (button == 2) ? 0 : editor.block
 		arr[index(i, j)] = value
 		resetTileCache(i, j, true)
+		return
+	}
+	
+	if (mode == 'cave') {
+		let pos = index(i, j)
+		if (button != 2) {
+			if (!map.blData[pos]) return
+			map.bgData[pos] = map.blData[pos]
+			map.blData[pos] = 0
+		} else {
+			map.blData[pos] = map.bgData[pos]
+		}
+		resetTileCache(i, j, true)
+		return
+	}
+	
+	if (mode == 'replace') {
+		let pos = index(i, j)
+		let value = editor.block
+		for (let prop of ['bl', 'bg', 'fg']) {
+			let arr = map[prop + 'Data']
+			if (arr[pos]) {
+				arr[pos] = value
+			}
+		}
+		resetTileCache(i, j, true)
+		return
 	}
 	
 	if (mode == 'player') {
@@ -181,6 +238,7 @@ function mapInteract(x, y, button) {
 			y: j + 1,
 			dir: +!!(x > i + 0.5),
 		}
+		return
 	}
 	
 	if (mode == 'tedraw' || mode == 'teedit') {
@@ -218,6 +276,7 @@ function mapInteract(x, y, button) {
 		}
 		addTileEntity(teNew)
 		//resetTileCache(i, j, false)
+		return
 	}
 	
 	if (mode == 'resize') {
@@ -241,6 +300,7 @@ function mapInteract(x, y, button) {
 		
 		if (dx == 0 && dy == 0 && nw == map.w && nh == map.h) return
 		resizeMap(dx, dy, nw, nh)
+		return
 	}
 }
 
@@ -348,7 +408,7 @@ function createEditorGUI() {
 	selBlock.value = editor.block
 	selBlock.onchange = () => {
 		editor.selectBlock(selBlock.value)
-		if (!(['bl', 'bg', 'fg'].includes(editor.mode))) {
+		if (!(['bl', 'bg', 'fg', 'cave', 'replace'].includes(editor.mode))) {
 			editor.selectMode('bl')
 		}
 	}
@@ -367,6 +427,17 @@ function createEditorGUI() {
 		editor.selectMode('tedraw')
 	}
 	guiContainer.appendChild(selTE)
+	
+	addComment('Brush size:')
+	let inpBrushSize = document.createElement('input')
+	inpBrushSize.type = 'number'
+	inpBrushSize.min = 1
+	inpBrushSize.max = 10
+	inpBrushSize.value = editor.brushSize
+	inpBrushSize.onchange = function() {
+		editor.brushSize = this.value
+	}
+	guiContainer.appendChild(inpBrushSize)
 	
 	addComment('Load from file:')
 	let btOpen = document.createElement('input')
@@ -417,7 +488,7 @@ function createEditorGUI() {
 	lvlNameInput.oninput = function() {
 		map.name = this.value
 	}
-	//lvlNameInput.value = 'untitled'
+	lvlNameInput.value = 'untitled'
 	guiContainer.appendChild(lvlNameInput)
 	// disable event processing by the game controls
 	for (let name of ['keydown', 'keyup']) {
@@ -427,12 +498,13 @@ function createEditorGUI() {
 	let btLoad = document.createElement('input')
 	btLoad.type = 'button'
 	btLoad.onclick = () => {
-		let lvlName = map.name
+		let lvlName = prompt('Enter lvl name (without ".json", just the name)')
+		if (!lvlName) return
 		loadLvl(lvlName)
 			.then((data) => startEditor(data))
 			.catch((error) => alert('Cannot get "' + lvlName + '.json" from "lvls" folder! ' + error))
 	}
-	btLoad.value = 'Load game lvl by name'
+	btLoad.value = 'Load game lvl by name...'
 	guiContainer.appendChild(btLoad)
 	
 	let btPlay = document.createElement('input')

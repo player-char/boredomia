@@ -27,8 +27,8 @@ function showSignMessage(text, color) {
 }
 
 function hideSignMessage() {
-	if (!pl || !pl.paused) return
+	if (!pl || !pl.paused || !pl.alive) return false
 	pl.paused = false
 	signBox.style.display = 'none'
-	resetControls()
+	return true
 }

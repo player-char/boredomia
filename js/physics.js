@@ -9,6 +9,7 @@ function initPlayer() {
 		ground: true,
 		alive: true,
 		bored: false,
+		paused: false,
 		score: 0,
 		portalImmune: false,
 		editor: false,
@@ -18,8 +19,16 @@ function initPlayer() {
 	savePlayer()
 }
 
-function savePlayer() {
-	pl.save = JSON.stringify(pl, (key, value) => key == 'save' ? null : value)
+function savePlayer(x, y) {
+	let saveData = Object.assign({}, pl)
+	saveData.save = null
+	if (x && y) {
+		saveData.x = x
+		saveData.y = y
+		saveData.vx = 0.0
+		saveData.vy = 0.0
+	}
+	pl.save = JSON.stringify(saveData)
 }
 
 function resetPlayer() {
@@ -38,8 +47,8 @@ const PHYS = {
 	ga:       0.03   * (timeFactor**2) , // gravity acceleration
 	runa:     0.06   * (timeFactor**2) , // running acceleration
 	flya:     0.01   * (timeFactor**2) , // flying acceleration
-	stopv:    0.08   * timeFactor      , // stop speed
-	jumpv:    0.47   * timeFactor      , // jump start speed
+	stopv:    0.12   * timeFactor      , // stop speed
+	jumpv:    0.485  * timeFactor      , // jump start speed
 	maxvx:    0.5    * timeFactor      , // max horizontal speed
 	maxvy:    0.9375 * timeFactor      , // max vertical speed
 	ladderv:  0.1    * timeFactor      , // speed when on ladder
@@ -53,15 +62,11 @@ const PHYS = {
 	zoombase: 1.1                      , // editor zoom base
 	zoommin:  1                        , // editor zoom limit
 	zoommax:  4                        , // editor zoom limit
-	eps:      0.01                     , // epsilon, a small number for offsets
+	eps:      0.001                    , // epsilon, a small number for offsets
 }
 
-function isSolid(b) {
-	return blockSolid[b]
-}
-
-function isDeadly(b) {
-	return b === 10
+function isSolidAt(x, y) {
+	return blockSolid[getBlockAt(x, y)]
 }
 
 function isLadderAt(x, y) {
@@ -69,20 +74,40 @@ function isLadderAt(x, y) {
 	return te && te.type == 'ladder'
 }
 
-function processPhysics(inputs) {
-	// editor physics
+function processGameTick() {
+	if (!pl || pl.paused) return
+
+	let inputs = getKeyInputs()
+	
 	if (pl.editor) {
-		pl.x += PHYS.edflyv * inputs.x
-		pl.y -= PHYS.edflyv * inputs.y
-		
-		if (inputs.zoom) {
-			zoom *= PHYS.zoombase ** inputs.zoom
-			zoom = Math.min(Math.max(PHYS.zoommin, zoom), PHYS.zoommax)
-			resize()
-		}
-		
-		return
+		processEditorActions(pl, inputs)
+	} else {
+		processPlayerActions(pl, inputs)
 	}
+	//if (!pl.editor) {
+	//	processWorldActions()
+	//}
+}
+
+function processEditorActions(pl, inputs) {
+	pl.x += PHYS.edflyv * inputs.x
+	pl.y -= PHYS.edflyv * inputs.y
+	
+	if (inputs.zoom) {
+		zoom *= PHYS.zoombase ** inputs.zoom
+		zoom = Math.min(Math.max(PHYS.zoommin, zoom), PHYS.zoommax)
+		resize()
+	}
+}
+
+
+function processPlayerActions(pl, inputs) {
+	processPlayerMovement(pl, inputs)
+	processPlayerTileVisit(pl, inputs.action)
+	processPlayerHazards(pl)
+}
+
+function processPlayerMovement(pl, inputs) {
 	// game physics
 	if (pl.jumpCooldown) {
 		pl.jumpCooldown--
@@ -94,7 +119,7 @@ function processPhysics(inputs) {
 		if (pl.vx < -PHYS.maxvy) pl.vy = -PHYS.maxvy
 		pl.dir = +(inputs.x > 0)
 	}
-	if (pl.ground && inputs.y > 0 && !pl.jumpCooldown) {
+	if (pl.ground && (inputs.y > 0 || inputs.space) && !pl.jumpCooldown) {
 		// jump
 		pl.ground = false
 		pl.vy = -PHYS.jumpv
@@ -121,9 +146,9 @@ function processPhysics(inputs) {
 	
 	// check ceiling
 	if (pl.vy <= 0.0) {
-		let crb = getBlockAt(pl.x + PHYS.ulw, newy - PHYS.uh)
-		let clb = getBlockAt(pl.x - PHYS.ulw, newy - PHYS.uh)
-		if (isSolid(crb) || isSolid(clb)) {
+		let crb = isSolidAt(pl.x + PHYS.ulw, newy - PHYS.uh)
+		let clb = isSolidAt(pl.x - PHYS.ulw, newy - PHYS.uh)
+		if (crb || clb) {
 			pl.y = Math.ceil(newy - PHYS.uh) + PHYS.uh + PHYS.eps
 			pl.vy = 0.0
 		}
@@ -131,11 +156,11 @@ function processPhysics(inputs) {
 	
 	// check walls
 	for (let dir of [-1.0, 1.0]) {
-		let wlb = getBlockAt(newx + PHYS.uw * dir, pl.y - 0.3)
-		let wub = getBlockAt(newx + PHYS.uw * dir, pl.y - 0.5)
-		if (isSolid(wlb) || isSolid(wub)) {
+		let wlb = isSolidAt(newx + PHYS.uw * dir, pl.y - 0.3)
+		let wub = isSolidAt(newx + PHYS.uw * dir, pl.y - 0.5)
+		if (wlb || wub) {
 			pl.vx = 0.0
-			if (isSolid(wlb)) {
+			if (wlb) {
 				pl.x = Math.floor(pl.x) + 0.5 + dir * (0.5 - PHYS.uw - PHYS.eps)
 			}
 		}
@@ -143,77 +168,95 @@ function processPhysics(inputs) {
 	
 	// movement
 	pl.x += pl.vx
-	if (!pl.ground) {
-		pl.y += pl.vy
-		pl.vy += PHYS.ga
-		if (pl.vy > PHYS.maxvy) pl.vy = PHYS.maxvy
-		
-		// landing
-		let rb = getBlockAt(pl.x + (inputs.x > 0 ? PHYS.uw : PHYS.ulw), pl.y)
-		let lb = getBlockAt(pl.x - (inputs.x < 0 ? PHYS.uw : PHYS.ulw), pl.y)
-		if (isDeadly(rb) || isDeadly(lb)) {
-			pl.alive = false
-			pl.bored = true
-		}
-		if (isSolid(rb) || isSolid(lb)) {
-			pl.y = Math.floor(pl.y)
-			pl.vy = 0.0
-			pl.ground = true
-		}
-	} else {
-		// fall down
-		let rb = getBlockAt(pl.x + PHYS.ulw, pl.y + PHYS.eps)
-		let lb = getBlockAt(pl.x - PHYS.ulw, pl.y + PHYS.eps)
-		if (!isSolid(rb) && !isSolid(lb)) {
-			pl.ground = false
-		} else if (inputs.y < 0) {
+	if (pl.ground) {
+		if (inputs.y < 0) {
 			// falling down intentionally
-			let rb = getBlockAt(pl.x + PHYS.uw, pl.y + PHYS.eps)
-			let lb = getBlockAt(pl.x - PHYS.uw, pl.y + PHYS.eps)
-			let dir = (!isSolid(rb) - !isSolid(lb))
+			let rb = isSolidAt(pl.x + PHYS.uw, pl.y + PHYS.eps)
+			let lb = isSolidAt(pl.x - PHYS.uw, pl.y + PHYS.eps)
+			let dir = (!rb - !lb)
 			if (dir && dir * pl.vx >= 0) {
 				pl.x += 0.17 * dir
 				pl.vx = 0
 			}
 		}
+		// fall down
+		let rb = isSolidAt(pl.x + PHYS.ulw, pl.y + PHYS.eps)
+		let lb = isSolidAt(pl.x - PHYS.ulw, pl.y + PHYS.eps)
+		if (!rb && !lb) {
+			pl.ground = false
+		}
+	}
+	if (!pl.ground) {
+		// not on ground
+		pl.y += pl.vy + 0.5 * PHYS.ga
+		pl.vy += PHYS.ga
+		if (pl.vy > PHYS.maxvy) pl.vy = PHYS.maxvy
+		
+		// landing
+		let rb = isSolidAt(pl.x + (inputs.x > 0 ? PHYS.uw : PHYS.ulw), pl.y)
+		let lb = isSolidAt(pl.x - (inputs.x < 0 ? PHYS.uw : PHYS.ulw), pl.y)
+		
+		if (rb || lb) {
+			pl.y = Math.floor(pl.y)
+			pl.vy = 0.0
+			pl.ground = true
+		}
 	}
 	
 	// horizontal movement friction
-	if (inputs.x == 0 && Math.abs(pl.vx) < PHYS.stopv) {
+	if (pl.ground && inputs.x == 0 && Math.abs(pl.vx) < PHYS.stopv) {
+		// full stop
 		pl.vx = 0.0
 	} else {
+		// friction
 		pl.vx *= pl.ground ? PHYS.gammar : PHYS.gammaf
 	}
 	// vertical movement friction
 	pl.vy *= PHYS.gammaf
+}
+
+function killPlayer() {
+	pl.paused = true
+	pl.alive = false
+	pl.bored = true
+}
+
+function isDeadlyAt(x, y) {
+	let b = getBlockAt(x, y)
+	return b === 10
+}
+
+function processPlayerHazards(pl) {
+	// check if player fell out of map
+	if (pl.y > map.w + 3) {
+		killPlayer()
+		return
+	}
 	
+	// check nearby blocks for being dangerous
+	let rlb = isDeadlyAt(pl.x + PHYS.uw, pl.y - PHYS.eps)
+	let llb = isDeadlyAt(pl.x - PHYS.uw, pl.y - PHYS.eps)
+	let rub = isDeadlyAt(pl.x + PHYS.uw, pl.y - PHYS.uh)
+	let lub = isDeadlyAt(pl.x - PHYS.uw, pl.y - PHYS.uh)
+	if (rlb || rub || llb || lub) {
+		killPlayer()
+		return
+	}
+}
+
+function processPlayerTileVisit(pl, action) {
 	let bi = Math.floor(pl.x)
 	let bj = Math.floor(pl.y - PHYS.uh / 2)
 	
-	// tileentity collision
-	let te = getTileEntity(bi, bj)
-	if (!te || te.type != 'portal') {
-		pl.portalImmune = false
-	}
-	if (te) {
-		if (te.collect) {
-			collectTileEntity(te)
-		} else {
-			tryEnterPortal(te)
-			if (te.type === 'sign' && inputs.action) {
-				// alert is to be replaced with an appropriate way of displaying
-				let signColor = te.sprite != 'signrock' ? '#974' : '#666'
-				showSignMessage(te.text, signColor)
-				//resetControls()
-				//alert(te.text)
-			}
-		}
-	}
-	
-	// foreground uncover
+	processForegroundDiscovery(bi, bj)
+	processPlayerTileEntityCollision(pl, bi, bj, action)
+}
+
+function processForegroundDiscovery(bi, bj) {
 	let bpos = getValidIndex(bi, bj)
 	let fg = map.fgData[bpos]
 	let fgCurr = map.fgDataCurr[bpos]
+	
 	if (map.fgEntrance) {
 		// leave hidden area
 		if (fg === 0 || fgCurr !== 0) {
@@ -237,6 +280,37 @@ function processPhysics(inputs) {
 					requestTileUpdate(i, j, true)
 				})
 		}
+	}
+}
+
+function processPlayerTileEntityCollision(pl, bi, bj, action) {
+	let te = getTileEntity(bi, bj)
+	
+	if (!te || te.type != 'portal') {
+		pl.portalImmune = false
+	}
+	if (!te) return
+	if (te.collect) {
+		collectTileEntity(te)
+		return
+	}
+	
+	switch (te.type) {
+		case 'portal':
+			tryEnterPortal(te)
+		break
+		case 'sign':
+			if (action) {
+				let signColor = te.sprite != 'signrock' ? '#974' : '#666'
+				showSignMessage(te.text, signColor)
+			}
+		break
+		case 'checkpoint':
+			savePlayer(te.x + 0.5, te.y + 1.0)
+		break
+		case 'death':
+			killPlayer()
+		break
 	}
 }
 
@@ -265,19 +339,27 @@ function tryEnterPortal(te) {
 	
 	//pl.x = pl.x - te.x + destTE.x
 	//pl.y = pl.y - te.y + destTE.y
+	
+	// teleport player to the center of the tile
 	pl.x = destTE.x + 0.5
 	pl.y = destTE.y + 1
+	
+	// prevent entering portal again
 	pl.portalImmune = true
+	
 	if (lvlName != '@') {
 		map = newMap
 		// save player when entering another lvl
-		savePlayer()
+		savePlayer(pl.x, pl.y)
 	}
+	processPlayerTileVisit(pl, false)
 	requestFullTileUpdate()
 }
 
 function collectTileEntity(te) {
-	pl.score += te.score
+	if (te.score) {
+		pl.score += te.score
+	}
 	pl.progress[map.name + ':' + te.id] = 1
 	destroyTileEntity(te)
 }

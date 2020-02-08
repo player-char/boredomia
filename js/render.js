@@ -95,6 +95,7 @@ function renderScreen() {
 		bm.strokeStyle = '#000'
 		bm.strokeRect(w2 - Math.floor(cx * tsz), h2 - Math.floor(cy * tsz), map.w * tsz, map.h * tsz)
 		
+		// default player pos
 		let xPlayerOffset = (map.defaultPlayerPos.x - pl.x) * tsz
 		let yPlayerOffset = (map.defaultPlayerPos.y - pl.y) * tsz
 		renderOrangeC(bm, xPlayerOffset + w2-tsz2, yPlayerOffset + h2+tsz4, tsz, map.defaultPlayerPos.dir, false)
@@ -141,13 +142,11 @@ function renderTileGrid(bm, cx, cy) {
 	if (tileCache.updateAll) {
 		dcx = 0
 		dxy = 0
-		tileCache.fcx = fcx
-		tileCache.fcy = fcy
 	} else if (dcx || dcy) {
 		tileCache.bm.drawImage(tileCache.canv, (tileCache.fcx - fcx) * tsz, (tileCache.fcy - fcy) * tsz)
-		tileCache.fcx = fcx
-		tileCache.fcy = fcy
 	}
+	tileCache.fcx = fcx
+	tileCache.fcy = fcy
 	
 	for (let j = 0; j < tileCache.h; j++) {
 		for (let i = 0; i < tileCache.w; i++) {
@@ -172,14 +171,16 @@ function requestTileUpdate(bi, bj, blockUpdate) {
 	if (!tileCache) return
 	let i = bi - tileCache.fcx
 	let j = bj - tileCache.fcy
+	requestRelativeTileUpdate(i, j)
+	if (blockUpdate) {
+		// update block below because its top could change
+		requestRelativeTileUpdate(i, j + 1)
+	}
+}
+
+function requestRelativeTileUpdate(i, j) {
 	if (Math.abs(i) <= tileCache.tcw2 && Math.abs(j) <= tileCache.tch2) {
 		tileCache.update[(j + tileCache.tch2) * tileCache.w + (i + tileCache.tcw2)] = 1
-	}
-	if (blockUpdate) {
-		j += 1
-		if (Math.abs(i) <= tileCache.tcw2 && Math.abs(j) <= tileCache.tch2) {
-			tileCache.update[(j + tileCache.tch2) * tileCache.w + (i + tileCache.tcw2)] = 1
-		}
 	}
 }
 
@@ -314,6 +315,13 @@ function renderTileEntity(bm, x, y, te) {
 			case 'ladderiron':
 				bm.fillStyle = '#888'
 			break
+			case 'none':
+				if (pl.editor) {
+					bm.fillStyle = '#f00'
+					bm.fillRect(x + tsz2 - tsz6 / 2, y + tsz2 - tsz6 / 2, tsz6, tsz6)
+				}
+				return
+			break
 		}
 		if (te.sprite.startsWith('sign')) {
 			bm.fillStyle = '#000'
@@ -351,8 +359,6 @@ function renderTileFrame(bm, x, y, d, lw, color) {
 }
 
 function renderOrangeC(bm, x, y, size, dir, bored) {
-	//bm.fillStyle = '#fa0'
-	//bm.fillRect(x, y, w, h)
     bm.drawImage(getCachedSprite('orangec' + dir, size), x, y)
 	if (bored) {
 		bm.drawImage(getCachedSprite('bored' + dir, size), x, y)
@@ -375,6 +381,7 @@ function strokeFillText(bm, text, x, y) {
 }
 
 function renderDebug(debug) {
+	// latency plot
 	let latW = Math.floor(w / 2)
 	let latH = Math.floor(h / 5)
 	let latY = h - 20
@@ -405,6 +412,7 @@ function renderDebug(debug) {
 	bm.stroke()
 	
 	// coords
+	if (!pl) return
 	bm.font = tsz3 + 'px monospace'
 	bm.textAlign = 'left'
 	bm.textBaseline = 'top'
@@ -413,10 +421,11 @@ function renderDebug(debug) {
 	bm.lineWidth = Math.ceil(tsz4 * 0.2)
 	let i = 0
 	for (let prop of ['x', 'y', 'vx', 'vy', 'ground']) {
+		let value = pl[prop]
+		if (value == null) continue
+		if (typeof(value) == 'number') value = value.toFixed(3)
 		let x = 10
 		let y = 30 + (++i) * tsz3
-		let value = pl[prop]
-		if (typeof(value) == 'number') value = value.toFixed(3)
 		strokeFillText(bm, prop + ': ' + value, x, y)
 	}
 }
